@@ -28,7 +28,8 @@ interface ArticleCardProps {
 
 export function ArticleCard({ article }: ArticleCardProps) {
   const { mode } = useImageMode()
-  const images = article.preview_images.split(',').filter(Boolean)
+  const images = (article.preview_images || '').split(',').filter(Boolean)
+  const activeImage = images[currentIndex] || images[0] || ''
   const [currentIndex, setCurrentIndex] = useState(0)
   const [imageError, setImageError] = useState(false)
 
@@ -93,7 +94,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
       >
         <div className='glass-popover relative w-auto max-w-[95vw] rounded-lg border-none bg-black/95 p-0 p-4 sm:max-w-none'>
           <img
-            src={images[currentIndex]}
+            src={activeImage}
             alt={`${article.title}-${currentIndex}`}
             className='max-h-[85vh] max-w-[90vw] rounded-lg object-contain'
           />
@@ -158,9 +159,9 @@ export function ArticleCard({ article }: ArticleCardProps) {
             {article.section}
           </Badge>
 
-          {article.sub_type && (
+          {article.category && (
             <Badge variant='outline' className='shadow-sm'>
-              {article.sub_type}
+              {article.category}
             </Badge>
           )}
 

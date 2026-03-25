@@ -9,4 +9,4 @@ class ArticleQuery(BaseModel):
     keyword: Optional[str] = None
     publish_date_range: Optional[dict] = None
     section: Optional[str] = None
-    sub_type: Optional[str] = None
+    category: Optional[str] = None

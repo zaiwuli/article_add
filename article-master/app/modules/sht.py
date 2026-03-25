@@ -1,11 +1,12 @@
-from urllib.parse import urlparse, parse_qs, urlencode
-from curl_cffi import requests
-from pyquery import PyQuery as pq
+import binascii
+import hashlib
 import re
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlencode, urlparse
+
 import bencoder
-import hashlib
-import binascii
+from curl_cffi import requests
+from pyquery import PyQuery as pq
 
 from app.core import settings
 from app.utils.log import logger
@@ -13,21 +14,22 @@ from app.utils.log import logger
 
 def extract_and_convert_video_size(html_content):
     doc = pq(html_content)
-    message_text = doc('.message').text()
-    clean_text = re.sub(r'\s+', ' ', message_text).strip()
+    message_text = doc(".message").text()
+    clean_text = re.sub(r"\s+", " ", message_text).strip()
     pattern = r"(\d+\.?\d*)([GM])"
     match = re.search(pattern, clean_text)
     if not match:
         return None
+
     size_num_str, unit = match.groups()
     try:
         size_num = float(size_num_str)
     except ValueError:
         return None
 
-    if unit.upper() == 'G':
+    if unit.upper() == "G":
         mb_size = size_num * 1024
-    elif unit.upper() == 'M':
+    elif unit.upper() == "M":
         mb_size = size_num
     else:
         return None
@@ -36,9 +38,9 @@ def extract_and_convert_video_size(html_content):
 
 def extract_safeid(html_content):
     doc = pq(html_content)
-    for script_elem in doc('script'):
+    for script_elem in doc("script"):
         script_text = pq(script_elem).text().strip()
-        if not script_text or 'safeid' not in script_text:
+        if not script_text or "safeid" not in script_text:
             continue
         match = re.search(r"safeid\s*=\s*['\"]([^'\"]+)['\"]", script_text)
         if match:
@@ -46,53 +48,50 @@ def extract_safeid(html_content):
     return None
 
 
-def extract_exact_datetime(html_content):
+def extract_exact_date(html_content):
     doc = pq(html_content)
-    date_text = doc('dt.z.cl').eq(0).text().strip()
+    date_text = doc("dt.z.cl").eq(0).text().strip()
     if not date_text:
         return ""
-    processed_text = date_text.replace('&nbsp;', ' ').strip()
-    processed_text = re.sub(r'\s+', ' ', processed_text)
+
+    processed_text = re.sub(r"\s+", " ", date_text.replace("&nbsp;", " ")).strip()
     today = datetime.now().date()
-    if re.match(r'^\d+ 小时前$', processed_text):
-        return today.strftime('%Y-%m-%d')
-    elif processed_text.startswith('半小时前'):
-        return today.strftime('%Y-%m-%d')
-    elif re.match(r'^\d+ 分钟前$', processed_text):
-        return today.strftime('%Y-%m-%d')
-    elif re.match(r'^\d+ 秒前$', processed_text):
-        return today.strftime('%Y-%m-%d')
-    elif processed_text.startswith('昨天 '):
-        yesterday = today - timedelta(days=1)
-        return yesterday.strftime('%Y-%m-%d')
-    elif processed_text.startswith('前天 '):
-        day_before_yesterday = today - timedelta(days=2)
-        return day_before_yesterday.strftime('%Y-%m-%d')
-    elif re.match(r'^\d+ 天前$', processed_text):
-        days = int(re.search(r'(\d+) 天前', processed_text).group(1))
-        target_date = today - timedelta(days=days)
-        return target_date.strftime('%Y-%m-%d')
-    elif re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', processed_text):
-        pure_date_str = processed_text.split(' ')[0]
-        return pure_date_str
-    else:
-        logger.error(f"警告：无法解析的日期格式 → {date_text}")
-        return None
+    if re.match(r"^\d+ \u5c0f\u65f6\u524d$", processed_text):
+        return today.strftime("%Y-%m-%d")
+    if processed_text == "\u534a\u5c0f\u65f6\u524d":
+        return today.strftime("%Y-%m-%d")
+    if re.match(r"^\d+ \u5206\u949f\u524d$", processed_text):
+        return today.strftime("%Y-%m-%d")
+    if re.match(r"^\d+ \u79d2\u524d$", processed_text):
+        return today.strftime("%Y-%m-%d")
+    if processed_text.startswith("\u6628\u5929 "):
+        return (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    if processed_text.startswith("\u524d\u5929 "):
+        return (today - timedelta(days=2)).strftime("%Y-%m-%d")
+    if re.match(r"^\d+ \u5929\u524d$", processed_text):
+        days = int(re.search(r"(\d+) \u5929\u524d", processed_text).group(1))
+        return (today - timedelta(days=days)).strftime("%Y-%m-%d")
+    if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", processed_text):
+        return processed_text.split(" ")[0]
+
+    logger.warning(f"unsupported date format: {date_text}")
+    return None
 
 
 def extract_bracket_content(html_content):
     doc = pq(html_content)
-    h2_text = doc('h2.n5_bbsnrbt').text()
-    clean_text = h2_text.strip()
-    pattern = r"\[(.*?)\]"
-    match = re.search(pattern, clean_text)
-
+    h2_text = doc("h2.n5_bbsnrbt").text().strip()
+    match = re.search(r"\[(.*?)\]", h2_text)
     if match:
         return match.group(1)
-    else:
-        return None
+    return None
 
 
+def extract_edk(text):
+    match = re.search(r"ed2k://\|file\|.+?\|/", text)
+    if match:
+        return match.group()
+    return None
 
 
 class SHT:
@@ -103,43 +102,53 @@ class SHT:
     flare_solver = None
 
     def __init__(self):
-        ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1"
-        self.headers = {
-            'User-Agent': ua
-        }
-        self.cookie = {
-            '_safe': ''
-        }
+        ua = (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 "
+            "Mobile/15E148 Safari/604.1"
+        )
+        self.headers = {"User-Agent": ua}
+        self.cookie = {"_safe": ""}
         self.proxies = {
             "http": settings.PROXY,
-            "https": settings.PROXY
+            "https": settings.PROXY,
         }
         self.flare_solver = settings.FLARE_SOLVERR_URL
 
     def get_original(self, url):
-        res = requests.get(url, proxies=self.proxies, cookies=self.cookie, headers=self.headers,
-                           allow_redirects=True, timeout=10, impersonate="chrome110")
-        html = res.text.encode('utf-8')
+        res = requests.get(
+            url,
+            proxies=self.proxies,
+            cookies=self.cookie,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=10,
+            impersonate="chrome110",
+        )
+        html = res.text.encode("utf-8")
         doc = pq(html)
-        page_title = doc('head>title').text()
-        if 'Just a moment' in page_title:
-            logger.warning("触发CF，尝试过盾")
+        page_title = doc("head>title").text()
+
+        if "Just a moment" in page_title:
+            logger.warning("cloudflare challenge detected")
             html = self.bypass_cf(url)
             if not html:
-                logger.error("过盾失败")
+                logger.error("failed to bypass cloudflare")
                 return None
+
         doc = pq(html)
         if "var safeid" in doc.text():
-            logger.warning("触发18禁,获取safeid")
+            logger.warning("safeid challenge detected")
             html = self.bypass_r18(html, url)
             if not html:
-                logger.error("过18禁失败")
+                logger.error("failed to bypass safeid challenge")
                 return None
+
         doc = pq(html)
-        page_title = doc('head>title').text()
-        if "98堂" in page_title:
+        if doc("div.n5_htnrys.cl") or doc("div.message") or doc("h2.n5_bbsnrbt"):
             return html
-        else:
+
+        if page_title:
             logger.warning(page_title)
         return None
 
@@ -148,129 +157,153 @@ class SHT:
             "cmd": "request.get",
             "url": url,
             "maxTimeout": 60000,
-            "proxy": {"url": self.proxies['http']},
-            "cookies": [{"name": k, "value": v} for k, v in self.cookie.items()]
+            "proxy": {"url": self.proxies["http"]},
+            "cookies": [
+                {"name": key, "value": value}
+                for key, value in self.cookie.items()
+            ],
         }
-        res = requests.post(self.flare_solver, headers={"Content-Type": "application/json"}, json=payload)
+        res = requests.post(
+            self.flare_solver,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+        )
         result = res.json()
-        if result['solution']['status'] != 200:
+        if result["solution"]["status"] != 200:
             return None
-        html = result['solution']['response'].encode('utf-8')
+
+        html = result["solution"]["response"].encode("utf-8")
         doc = pq(html)
         if "var safeid" in doc.text():
             safeid = extract_safeid(html)
-            self.cookie['_safe'] = safeid
+            self.cookie["_safe"] = safeid
             return self.bypass_cf(url)
         return html
 
     def bypass_r18(self, html, url):
         safeid = extract_safeid(html)
-        if safeid:
-            self.cookie['_safe'] = safeid
-            res = requests.get(url, proxies=self.proxies, cookies=self.cookie, headers=self.headers,
-                               allow_redirects=True, timeout=10, impersonate="chrome110")
-            html = res.text.encode('utf-8')
-            doc = pq(html)
-            page_title = doc('head>title').text()
-            if "98堂" in page_title:
-                return html
+        if not safeid:
+            return None
+
+        self.cookie["_safe"] = safeid
+        res = requests.get(
+            url,
+            proxies=self.proxies,
+            cookies=self.cookie,
+            headers=self.headers,
+            allow_redirects=True,
+            timeout=10,
+            impersonate="chrome110",
+        )
+        html = res.text.encode("utf-8")
+        doc = pq(html)
+        if doc("div.n5_htnrys.cl") or doc("div.message") or doc("h2.n5_bbsnrbt"):
+            return html
         return None
 
     def crawler_tid_list(self, url):
         try:
             html = self.get_original(url)
-            if html:
-                doc = pq(html)
-                items = doc("div.n5_htnrys.cl")[1:]
-                id_list = []
-                for item in items:
-                    pq_item = pq(item)
-                    link = pq_item("div a").eq(0).attr('href')  # 提取href属性
-                    parsed_url = urlparse(link)
-                    query_params = parse_qs(parsed_url.query)  # 解析为字典（值为列表）
-                    tid = query_params.get('tid', [''])[0]
+            if not html:
+                return []
+
+            doc = pq(html)
+            items = doc("div.n5_htnrys.cl")[1:]
+            id_list = []
+            for item in items:
+                link = pq(item)("div a").eq(0).attr("href")
+                if not link:
+                    continue
+                parsed_url = urlparse(link)
+                query_params = parse_qs(parsed_url.query)
+                tid = query_params.get("tid", [""])[0]
+                if tid:
                     id_list.append(int(tid))
-                return id_list
-        except Exception as e:
-            logger.error(f"抓取{url}失败:{e}")
-        return []
+            return id_list
+        except Exception as exc:
+            logger.error(f"failed to crawl tid list {url}: {exc}")
+            return []
 
     def crawler_detail(self, url):
         try:
             html = self.get_original(url)
-            if html:
-                doc = pq(html)
-                all_text = doc('div.blockcode').text()
-                magnet_pattern = r'magnet:\?xt=urn:btih:[0-9a-fA-F]+'
-                match = re.search(magnet_pattern, all_text)
-                magnet = None
-                if match:
-                    magnet = match.group()
-                if not magnet:
-                    torrent = doc("a:contains('.torrent')").eq(0)
-                    if torrent:
-                        torrent_url = torrent.attr('href')
-                        magnet = self.parse_torrent_get_magnet(url, f"https://sehuatang.org/{torrent_url}")
-                if magnet:
-                    date = extract_exact_datetime(html)
-                    size = extract_and_convert_video_size(html)
-                    sub_type = extract_bracket_content(html)
-                    title = doc('h2.n5_bbsnrbt').text()
-                    pattern = r"^\[.*?\]"
-                    title = re.sub(pattern, "", title).strip()
-                    img_elements = doc('div.message img')
-                    img_src_list = []
-                    for img in img_elements.items():
-                        src = img.attr('src')
-                        if src:
-                            img_src_list.append(src.strip())
-                    return {
-                        "title": title,
-                        "sub_type": sub_type,
-                        "publish_date": date,
-                        "magnet": magnet,
-                        "preview_images": ",".join(img_src_list),
-                        "size": size
-                    }
-        except Exception as e:
-            logger.error(f"抓取{url}失败:{e}")
-        return {}
+            if not html:
+                return {}
+
+            doc = pq(html)
+            all_text = doc("div.blockcode").text()
+            magnet_pattern = r"magnet:\?xt=urn:btih:[0-9a-fA-F]+(?:[^\s]*)?"
+            match = re.search(magnet_pattern, all_text)
+            magnet = match.group() if match else None
+            if not magnet:
+                torrent = doc("a:contains('.torrent')").eq(0)
+                if torrent:
+                    torrent_url = torrent.attr("href")
+                    if torrent_url:
+                        magnet = self.parse_torrent_get_magnet(
+                            url,
+                            f"https://sehuatang.org/{torrent_url}",
+                        )
+
+            if not magnet:
+                return {}
+
+            title = doc("h2.n5_bbsnrbt").text()
+            title = re.sub(r"^\[.*?\]", "", title).strip()
+            img_src_list = []
+            for img in doc("div.message img").items():
+                src = img.attr("src")
+                if src:
+                    img_src_list.append(src.strip())
+
+            return {
+                "title": title,
+                "category": extract_bracket_content(html),
+                "publish_date": extract_exact_date(html),
+                "magnet": magnet,
+                "preview_images": ",".join(img_src_list),
+                "size": extract_and_convert_video_size(html),
+                "edk": extract_edk(all_text),
+            }
+        except Exception as exc:
+            logger.error(f"failed to crawl detail {url}: {exc}")
+            return {}
 
     def parse_torrent_get_magnet(self, refer, torrent_source, is_local=False):
         try:
-            torrent_bin = None
             if is_local:
-                with open(torrent_source, "rb") as f:
-                    torrent_bin = f.read()
+                with open(torrent_source, "rb") as file:
+                    torrent_bin = file.read()
                 if len(torrent_bin) == 0:
-                    logger.error("错误：本地 torrent 文件为空")
+                    logger.error("local torrent file is empty")
                     return None
             else:
-                header = self.headers
-                header['Referer'] = refer
+                headers = dict(self.headers)
+                headers["Referer"] = refer
                 resp = requests.get(
                     torrent_source,
                     proxies=self.proxies,
                     cookies=self.cookie,
-                    headers=header,
+                    headers=headers,
                     allow_redirects=True,
                     timeout=10,
-                    impersonate="chrome110"
+                    impersonate="chrome110",
                 )
                 resp.raise_for_status()
                 torrent_bin = resp.content
                 if len(torrent_bin) < 100:
-                    logger.error(f"警告：下载内容过小（{len(torrent_bin)} 字节），非合法 torrent 文件")
+                    logger.error(
+                        f"torrent payload looks invalid: {len(torrent_bin)} bytes"
+                    )
                     return None
 
             torrent_dict = bencoder.decode(torrent_bin)
-            info_dict = None
             if b"info" in torrent_dict:
                 info_dict = torrent_dict[b"info"]
             elif "info" in torrent_dict:
                 info_dict = torrent_dict["info"]
             else:
-                logger.error("错误：种子缺少 info 核心字段（非合法 torrent 文件）")
+                logger.error("torrent file does not contain info node")
                 return None
 
             info_bin = bencoder.encode(info_dict)
@@ -284,22 +317,15 @@ class SHT:
                 torrent_name = info_dict["name"]
 
             if isinstance(torrent_name, bytes):
-                try:
-                    torrent_name = torrent_name.decode("utf-8")
-                except UnicodeDecodeError:
-                    torrent_name = torrent_name.decode("utf-8", errors="ignore")
-            elif isinstance(torrent_name, str):
-                pass
-            else:
+                torrent_name = torrent_name.decode("utf-8", errors="ignore")
+            elif not isinstance(torrent_name, str):
                 torrent_name = str(torrent_name)
+
             encoded_name = urlencode({"dn": torrent_name})[3:]
-            magnet_link = f"magnet:?xt=urn:btih:{info_hash_hex}&dn={encoded_name}"
-            return magnet_link
-        except Exception as e:
-            logger.error(f"网络请求失败：{e}")
+            return f"magnet:?xt=urn:btih:{info_hash_hex}&dn={encoded_name}"
+        except Exception as exc:
+            logger.error(f"failed to parse torrent: {exc}")
             return None
 
 
 sht = SHT()
-
-

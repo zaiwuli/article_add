@@ -1,14 +1,19 @@
 export interface Article {
+  id: number
   tid: number
   title: string
-  section: string
   publish_date: string
   magnet: string
   preview_images: string
-  sub_type: string
-  size: number
-  in_stock: boolean
   detail_url: string
+  size: number | null
+  section: string
+  category: string | null
+  website: string
+  create_time: string
+  update_time: string | null
+  edk: string | null
+  in_stock: boolean
 }
 
 export interface ArticleFilter {

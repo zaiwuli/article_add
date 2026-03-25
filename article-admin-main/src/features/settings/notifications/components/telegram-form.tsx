@@ -27,7 +27,7 @@ const telegramSchema = z.object({
 export function TelegramNotificationForm() {
   const tgTemplate = `🚀 {{title}}
 
-📁 板块：{{section}} / {{type}}
+📁 板块：{{section}} / {{category}}
 📦 体积：{{size}}
 🗓 发布：{{publish_date}}
 ⬇️ 下载器：{{downloader}}

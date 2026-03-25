@@ -29,7 +29,7 @@ const wechatSchema = z.object({
 })
 
 export function WechatNotificationForm() {
-  const wxTemplate = `📁 板块：{{section}} / {{type}}
+  const wxTemplate = `📁 板块：{{section}} / {{category}}
 📦 体积：{{size}}
 🗓 发布：{{publish_date}}
 ⬇️ 下载器：{{downloader}}

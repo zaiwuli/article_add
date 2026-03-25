@@ -53,5 +53,9 @@ def run_task(db: Session, task_id: int):
         kwargs = {}
         if args:
             kwargs = json.loads(str(args))
-        threading.Thread(target=lambda: FUNC_MAP[task.task_func](), kwargs=kwargs).start()
+        threading.Thread(
+            target=FUNC_MAP[task.task_func],
+            kwargs=kwargs,
+            daemon=True,
+        ).start()
     return success()
