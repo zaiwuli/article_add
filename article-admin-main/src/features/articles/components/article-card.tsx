@@ -25,9 +25,39 @@ interface ArticleCardProps {
   article: Article
 }
 
+function normalizeValues(
+  value: string | string[] | null | undefined,
+  options?: { splitComma?: boolean }
+) {
+  if (Array.isArray(value)) {
+    return value.map((item) => item.trim()).filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    const raw = value.trim()
+    if (!raw) {
+      return []
+    }
+
+    if (options?.splitComma) {
+      return raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+
+    return [raw]
+  }
+
+  return []
+}
+
 export function ArticleCard({ article }: ArticleCardProps) {
   const { mode } = useImageMode()
-  const images = (article.preview_images || '').split(',').filter(Boolean)
+  const images = normalizeValues(article.preview_images, { splitComma: true })
+  const magnetLinks = normalizeValues(article.magnet)
+  const edkLinks = normalizeValues(article.edk)
+  const primaryMagnet = magnetLinks[0] || ''
   const [currentIndex, setCurrentIndex] = useState(0)
   const activeImage = images[currentIndex] || images[0] || ''
   const [imageError, setImageError] = useState(false)
@@ -145,7 +175,9 @@ export function ArticleCard({ article }: ArticleCardProps) {
         <div className='flex flex-wrap items-center gap-2 text-xs'>
           <Badge variant='secondary'>{article.section}</Badge>
           {article.category && <Badge variant='outline'>{article.category}</Badge>}
-          <span className='text-muted-foreground'>{article.publish_date}</span>
+          {article.publish_date && (
+            <span className='text-muted-foreground'>{article.publish_date}</span>
+          )}
           {article.size && (
             <span className='rounded-full bg-muted px-2.5 py-1 font-medium'>
               {article.size} MB
@@ -168,7 +200,9 @@ export function ArticleCard({ article }: ArticleCardProps) {
 
         <div className='mt-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
           <span className='rounded-full border px-2.5 py-1'>{article.website}</span>
-          {article.edk && <span className='rounded-full border px-2.5 py-1'>ED2K</span>}
+          {edkLinks.length > 0 && (
+            <span className='rounded-full border px-2.5 py-1'>ED2K</span>
+          )}
           {article.detail_url && (
             <a
               href={article.detail_url}
@@ -190,7 +224,10 @@ export function ArticleCard({ article }: ArticleCardProps) {
               <Button
                 size='sm'
                 className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
-                onClick={() => handleCopy(article.magnet, '磁力链接已复制')}
+                disabled={!primaryMagnet}
+                onClick={() =>
+                  handleCopy(magnetLinks.join('\n'), '磁力链接已复制')
+                }
               >
                 <Copy className='h-4 w-4' />
                 <span className='hidden sm:inline'>复制 Magnet</span>
@@ -203,7 +240,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           </Tooltip>
         </TooltipProvider>
 
-        {article.edk && (
+        {edkLinks.length > 0 && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -211,7 +248,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
                   size='sm'
                   variant='outline'
                   className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
-                  onClick={() => handleCopy(article.edk || '', 'ED2K 已复制')}
+                  onClick={() => handleCopy(edkLinks.join('\n'), 'ED2K 已复制')}
                 >
                   <Link2 className='h-4 w-4' />
                   <span className='hidden sm:inline'>复制 ED2K</span>

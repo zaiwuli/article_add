@@ -17,6 +17,12 @@ UC_KEYWORDS: List[str] = ["UC", "无码", "步兵"]
 UHD_KEYWORDS: List[str] = ["4k", "8k", "2160p", "4K", "8K", "2160P"]
 
 
+def _first_value(value):
+    if isinstance(value, list):
+        return value[0] if value else ""
+    return value or ""
+
+
 def get_article_list(db: Session, query: ArticleQuery) -> Dict:
     q = db.query(Article)
     if query.keyword:
@@ -25,6 +31,8 @@ def get_article_list(db: Session, query: ArticleQuery) -> Dict:
         q = q.filter(Article.section == query.section)
     if query.category:
         q = q.filter(Article.category == query.category)
+    if query.website:
+        q = q.filter(Article.website == query.website)
     if query.publish_date_range:
         date_from = query.publish_date_range.get("from")
         date_to = query.publish_date_range.get("to")
@@ -73,7 +81,7 @@ def get_torrents(keyword, db: Session) -> Dict:
                 "size_mb": article.size,
                 "seeders": 66,
                 "title": article.title,
-                "download_url": article.magnet,
+                "download_url": _first_value(article.magnet),
                 "free": True,
                 "chinese": has_chinese(search_text),
                 "uc": has_uc(search_text),

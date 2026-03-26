@@ -20,6 +20,104 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+ARTICLE_SCHEMA = "sht"
+ARTICLE_TABLE = "article"
+ARTICLE_ARRAY_COLUMNS = {
+    "magnet": False,
+    "preview_images": True,
+    "edk": False,
+}
+
+
+def _get_column_udt_name(connection, schema_name: str, table_name: str, column_name: str):
+    return connection.execute(
+        text(
+            """
+            SELECT udt_name
+            FROM information_schema.columns
+            WHERE table_schema = :schema_name
+              AND table_name = :table_name
+              AND column_name = :column_name
+            """
+        ),
+        {
+            "schema_name": schema_name,
+            "table_name": table_name,
+            "column_name": column_name,
+        },
+    ).scalar()
+
+
+def _ensure_article_text_column(connection, column_name: str):
+    if not _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name):
+        return
+
+    connection.execute(
+        text(
+            f'''
+            ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
+            ALTER COLUMN "{column_name}" TYPE TEXT
+            '''
+        )
+    )
+
+
+def _ensure_article_array_column(
+    connection,
+    column_name: str,
+    *,
+    split_commas: bool = False,
+):
+    if not _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name):
+        return
+
+    using_expression = (
+        f"""
+        CASE
+            WHEN "{column_name}" IS NULL OR btrim("{column_name}") = '' THEN ARRAY[]::TEXT[]
+            WHEN left("{column_name}", 1) = '{{' AND right("{column_name}", 1) = '}}' THEN "{column_name}"::TEXT[]
+            ELSE array_remove(regexp_split_to_array("{column_name}", E'\\s*,\\s*'), '')
+        END
+        """
+        if split_commas
+        else f"""
+        CASE
+            WHEN "{column_name}" IS NULL OR btrim("{column_name}") = '' THEN ARRAY[]::TEXT[]
+            WHEN left("{column_name}", 1) = '{{' AND right("{column_name}", 1) = '}}' THEN "{column_name}"::TEXT[]
+            ELSE ARRAY["{column_name}"]
+        END
+        """
+    )
+
+    if _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name) != "_text":
+        connection.execute(
+            text(
+                f'''
+                ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
+                ALTER COLUMN "{column_name}" TYPE TEXT[] USING {using_expression}
+                '''
+            )
+        )
+
+    connection.execute(
+        text(
+            f'''
+            UPDATE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
+            SET "{column_name}" = ARRAY[]::TEXT[]
+            WHERE "{column_name}" IS NULL
+            '''
+        )
+    )
+    connection.execute(
+        text(
+            f'''
+            ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
+            ALTER COLUMN "{column_name}" SET DEFAULT ARRAY[]::TEXT[],
+            ALTER COLUMN "{column_name}" SET NOT NULL
+            '''
+        )
+    )
+
 
 def _normalize_database_schema(connection):
     if connection.dialect.name != "postgresql":
@@ -51,6 +149,16 @@ def _normalize_database_schema(connection):
             """
         )
     )
+
+    if connection.execute(text("SELECT to_regclass('sht.article')")).scalar():
+        _ensure_article_text_column(connection, "title")
+        _ensure_article_text_column(connection, "detail_url")
+        for column_name, split_commas in ARTICLE_ARRAY_COLUMNS.items():
+            _ensure_article_array_column(
+                connection,
+                column_name,
+                split_commas=split_commas,
+            )
 
 
 def init_database():

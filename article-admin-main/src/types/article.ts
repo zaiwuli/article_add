@@ -1,10 +1,12 @@
+export type ArticleMultiValue = string | string[] | null
+
 export interface Article {
   id: number
   tid: number
   title: string
-  publish_date: string
-  magnet: string
-  preview_images: string
+  publish_date: string | null
+  magnet: ArticleMultiValue
+  preview_images: ArticleMultiValue
   detail_url: string
   size: number | null
   section: string
@@ -12,7 +14,7 @@ export interface Article {
   website: string
   create_time: string
   update_time: string | null
-  edk: string | null
+  edk: ArticleMultiValue
 }
 
 export interface ArticleFilter {

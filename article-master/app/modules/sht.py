@@ -308,14 +308,16 @@ class SHT:
                 if src:
                     img_src_list.append(src.strip())
 
+            edk = extract_edk(all_text)
+
             return {
                 "title": title,
                 "category": extract_bracket_content(html),
                 "publish_date": extract_exact_date(html),
-                "magnet": magnet,
-                "preview_images": ",".join(img_src_list),
+                "magnet": [magnet],
+                "preview_images": img_src_list,
                 "size": extract_and_convert_video_size(html),
-                "edk": extract_edk(all_text),
+                "edk": [edk] if edk else [],
             }
         except Exception as exc:
             logger.error(f"failed to crawl detail {url}: {exc}")

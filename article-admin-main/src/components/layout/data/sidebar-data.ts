@@ -39,7 +39,7 @@ export const sidebarData: SidebarData = {
           icon: Bug,
         },
         {
-          title: 'API 中心',
+          title: '资源接口',
           url: '/api-center',
           icon: Waypoints,
         },

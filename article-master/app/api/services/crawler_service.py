@@ -1,7 +1,20 @@
 from urllib.parse import parse_qs, urlparse
 
-from sqlalchemy import func, select, text
+from sqlalchemy import (
+    MetaData,
+    Table,
+    and_,
+    bindparam,
+    create_engine,
+    func,
+    inspect,
+    select,
+    text,
+    tuple_,
+    update,
+)
 from sqlalchemy.orm import Session
+from sqlalchemy.types import ARRAY, JSON
 
 from app.api.services.user_service import (
     DEFAULT_ADMIN_PASSWORD,
@@ -15,6 +28,24 @@ from app.models.user import User
 from app.modules.sht import sht
 from app.scheduler.sht_section_registry import get_section_config
 from app.schemas.response import error, success
+
+TRANSFER_REQUIRED_COLUMNS = (
+    "tid",
+    "title",
+    "publish_date",
+    "magnet",
+    "edk",
+    "preview_images",
+    "detail_url",
+    "size",
+    "section",
+    "category",
+    "website",
+    "create_time",
+    "update_time",
+)
+TRANSFER_BATCH_SIZE = 500
+POSTGRES_SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "pg_toast"}
 
 
 def _extract_query_value(url: str, key: str):
@@ -36,6 +67,83 @@ def _build_detail_url(url: str, tid: int):
 def _normalize_website(url: str, fallback: str | None = None):
     parsed = urlparse(url)
     return (fallback or parsed.netloc or "sehuatang").strip()
+
+
+def _chunked(items, size: int):
+    for index in range(0, len(items), size):
+        yield items[index : index + size]
+
+
+def _split_qualified_table_name(table_name: str):
+    cleaned = table_name.strip()
+    parts = cleaned.split(".", 1)
+    if len(parts) == 2:
+        return parts[0].strip('"'), parts[1].strip('"')
+    return None, parts[0].strip('"')
+
+
+def _create_target_engine(database_url: str):
+    return create_engine(database_url.strip(), future=True, pool_pre_ping=True)
+
+
+def _load_target_table(engine, table_name: str):
+    schema_name, pure_table_name = _split_qualified_table_name(table_name)
+    metadata = MetaData()
+    return Table(
+        pure_table_name,
+        metadata,
+        schema=schema_name,
+        autoload_with=engine,
+    )
+
+
+def _normalize_transfer_value(column, value):
+    if isinstance(column.type, ARRAY):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            stripped = value.strip()
+            return [stripped] if stripped else []
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
+        return [str(value).strip()]
+
+    if isinstance(value, (list, tuple, set)):
+        if isinstance(column.type, JSON):
+            return list(value)
+        return ",".join(str(item).strip() for item in value if str(item).strip())
+
+    return value
+
+
+def _should_include_transfer_id(target_table: Table):
+    id_column = target_table.c.get("id")
+    if id_column is None:
+        return False
+    if id_column.server_default is not None or id_column.default is not None:
+        return False
+    if bool(id_column.autoincrement):
+        return False
+    return True
+
+
+def _build_transfer_row(
+    article: Article,
+    target_table: Table,
+    *,
+    include_id: bool = False,
+):
+    payload = {}
+    if include_id and "id" in target_table.c:
+        payload["id"] = getattr(article, "id")
+    for column_name in TRANSFER_REQUIRED_COLUMNS:
+        if column_name not in target_table.c:
+            continue
+        payload[column_name] = _normalize_transfer_value(
+            target_table.c[column_name],
+            getattr(article, column_name),
+        )
+    return payload
 
 
 def _upsert_article(db: Session, data: dict):
@@ -224,6 +332,184 @@ def save_url(url: str, db: Session, fid: str | None = None):
         )
 
     return error("unsupported url, only forumdisplay and viewthread are supported")
+
+
+def list_transfer_tables(database_url: str):
+    try:
+        engine = _create_target_engine(database_url)
+        inspector = inspect(engine)
+        dialect = engine.dialect.name
+        schema_names = []
+        try:
+            schema_names = inspector.get_schema_names()
+        except NotImplementedError:
+            schema_names = []
+
+        if dialect == "postgresql":
+            schema_names = [
+                schema_name
+                for schema_name in schema_names
+                if schema_name not in POSTGRES_SYSTEM_SCHEMAS
+            ]
+        elif dialect == "sqlite":
+            schema_names = ["main"]
+
+        if not schema_names:
+            schema_names = [None]
+
+        seen_tables = set()
+        tables = []
+        for schema_name in schema_names:
+            inspect_kwargs = {"schema": schema_name} if schema_name is not None else {}
+            for table_name in inspector.get_table_names(**inspect_kwargs):
+                qualified_name = (
+                    table_name
+                    if schema_name in (None, "main")
+                    else f"{schema_name}.{table_name}"
+                )
+                if qualified_name in seen_tables:
+                    continue
+                seen_tables.add(qualified_name)
+                tables.append(
+                    {
+                        "schema": None if schema_name in (None, "main") else schema_name,
+                        "name": table_name,
+                        "qualified_name": qualified_name,
+                    }
+                )
+
+        tables.sort(key=lambda item: item["qualified_name"])
+        return success({"dialect": dialect, "tables": tables})
+    except Exception as exc:
+        return error(f"failed to load target database tables: {exc}")
+    finally:
+        if "engine" in locals():
+            engine.dispose()
+
+
+def transfer_articles(database_url: str, table_name: str, db: Session):
+    source_articles = db.query(Article).order_by(Article.id.asc()).all()
+    if not source_articles:
+        return success(
+            {
+                "table_name": table_name,
+                "total": 0,
+                "inserted": 0,
+                "updated": 0,
+            },
+            message="no article data to transfer",
+        )
+
+    try:
+        engine = _create_target_engine(database_url)
+        target_table = _load_target_table(engine, table_name)
+
+        missing_columns = [
+            column_name
+            for column_name in TRANSFER_REQUIRED_COLUMNS
+            if column_name not in target_table.c
+        ]
+        if missing_columns:
+            return error(
+                "target table is missing required columns: "
+                + ", ".join(missing_columns)
+            )
+
+        include_id_on_insert = _should_include_transfer_id(target_table)
+        source_rows = [
+            _build_transfer_row(
+                article,
+                target_table,
+                include_id=include_id_on_insert,
+            )
+            for article in source_articles
+        ]
+        unique_pairs = list(
+            dict.fromkeys(
+                (row["website"], row["tid"])
+                for row in source_rows
+                if row.get("website") and row.get("tid") is not None
+            )
+        )
+
+        with engine.begin() as connection:
+            existing_pairs = set()
+            for pair_chunk in _chunked(unique_pairs, TRANSFER_BATCH_SIZE):
+                if not pair_chunk:
+                    continue
+                existing_rows = connection.execute(
+                    select(target_table.c.website, target_table.c.tid).where(
+                        tuple_(target_table.c.website, target_table.c.tid).in_(
+                            pair_chunk
+                        )
+                    )
+                ).all()
+                existing_pairs.update((row[0], row[1]) for row in existing_rows)
+
+            insert_rows = []
+            update_rows = []
+            for row in source_rows:
+                pair = (row.get("website"), row.get("tid"))
+                if pair[0] and pair[1] is not None and pair in existing_pairs:
+                    update_rows.append(row)
+                else:
+                    insert_rows.append(row)
+
+            if insert_rows:
+                connection.execute(target_table.insert(), insert_rows)
+
+            if update_rows:
+                update_columns = [
+                    column_name
+                    for column_name in TRANSFER_REQUIRED_COLUMNS
+                    if column_name not in {"website", "tid"}
+                    and column_name in target_table.c
+                ]
+                if update_columns:
+                    update_stmt = (
+                        update(target_table)
+                        .where(
+                            and_(
+                                target_table.c.website == bindparam("_website_key"),
+                                target_table.c.tid == bindparam("_tid_key"),
+                            )
+                        )
+                        .values(
+                            {
+                                column_name: bindparam(column_name)
+                                for column_name in update_columns
+                            }
+                        )
+                    )
+                    connection.execute(
+                        update_stmt,
+                        [
+                            {
+                                **{
+                                    column_name: row[column_name]
+                                    for column_name in update_columns
+                                },
+                                "_website_key": row["website"],
+                                "_tid_key": row["tid"],
+                            }
+                            for row in update_rows
+                        ],
+                    )
+
+        return success(
+            {
+                "table_name": target_table.fullname,
+                "total": len(source_rows),
+                "inserted": len(insert_rows),
+                "updated": len(update_rows),
+            },
+            message="articles transferred",
+        )
+    except Exception as exc:
+        return error(f"failed to transfer articles: {exc}")
+    finally:
+        if "engine" in locals():
+            engine.dispose()
 
 
 def reset_resource_table(db: Session):

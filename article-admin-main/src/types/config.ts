@@ -1,3 +1,5 @@
+import type { ArticleMultiValue } from './article'
+
 export interface TaskFunction {
   func_name: string
   func_label: string
@@ -20,12 +22,12 @@ export interface CrawlerPreviewArticle {
   title: string
   category?: string | null
   publish_date?: string | null
-  magnet?: string | null
-  preview_images?: string | null
+  magnet?: ArticleMultiValue
+  preview_images?: ArticleMultiValue
   detail_url: string
   size?: number | null
   website?: string | null
-  edk?: string | null
+  edk?: ArticleMultiValue
 }
 
 export interface CrawlerPreviewListItem {
@@ -54,4 +56,27 @@ export interface CrawlerSaveResult {
   updated?: number
   failed_ids?: number[]
   action?: 'created' | 'updated'
+}
+
+export interface TransferDatabaseConfig {
+  database_url: string
+  table_name: string
+}
+
+export interface TransferTableInfo {
+  schema?: string | null
+  name: string
+  qualified_name: string
+}
+
+export interface TransferTableResult {
+  dialect: string
+  tables: TransferTableInfo[]
+}
+
+export interface TransferArticleResult {
+  table_name: string
+  total: number
+  inserted: number
+  updated: number
 }

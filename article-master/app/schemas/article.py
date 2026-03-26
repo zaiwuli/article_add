@@ -10,3 +10,4 @@ class ArticleQuery(BaseModel):
     publish_date_range: Optional[dict] = None
     section: Optional[str] = None
     category: Optional[str] = None
+    website: Optional[str] = None

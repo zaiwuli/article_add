@@ -33,7 +33,7 @@ export function CrawlerCenter() {
             <h1 className='text-2xl font-bold'>爬虫中心</h1>
           </div>
           <p className='max-w-2xl text-sm text-muted-foreground'>
-            这里专门维护爬虫配置。设置模块、代理和 FlareSolverR 后，任务页会直接读取这些配置执行抓取。
+            这里统一维护爬虫模块、网络代理，以及抓取结果转存到其他数据库的目标连接。
           </p>
         </div>
 
