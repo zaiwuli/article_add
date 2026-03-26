@@ -1,6 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { SettingsCrawler } from '@/features/settings/crawler'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/settings/crawler')({
-  component: SettingsCrawler,
+  beforeLoad: () => {
+    throw redirect({ to: '/crawler' })
+  },
 })

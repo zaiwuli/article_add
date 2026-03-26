@@ -23,8 +23,8 @@ import { PasswordInput } from '@/components/password-input'
 const formSchema = z
   .object({
     username: z.string().min(2, '用户名至少 2 位'),
-    password: z.string().min(8, '密码至少 8 位'),
-    confirmPassword: z.string().min(8, '请再次输入密码'),
+    password: z.string().min(5, '密码至少 5 位'),
+    confirmPassword: z.string().min(5, '请再次输入密码'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: '两次输入的密码不一致',
@@ -103,7 +103,7 @@ export function SignUpForm({
               <FormControl>
                 <PasswordInput
                   autoComplete='new-password'
-                  placeholder='请输入密码'
+                  placeholder='至少 5 位'
                   {...field}
                 />
               </FormControl>

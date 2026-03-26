@@ -1,9 +1,9 @@
 import {
   Bug,
   Database,
-  HelpCircle,
   LayoutDashboard,
   ListTodo,
+  ScrollText,
   Settings,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -33,8 +33,8 @@ export const sidebarData: SidebarData = {
           icon: Database,
         },
         {
-          title: '爬虫',
-          url: '/settings/crawler',
+          title: '爬虫中心',
+          url: '/crawler',
           icon: Bug,
         },
       ],
@@ -48,9 +48,9 @@ export const sidebarData: SidebarData = {
           icon: Settings,
         },
         {
-          title: '帮助中心',
-          url: '/help-center',
-          icon: HelpCircle,
+          title: '日志空间',
+          url: '/logs',
+          icon: ScrollText,
         },
       ],
     },

@@ -23,6 +23,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    user_service.ensure_default_admin_user(db)
     user = user_service.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         return error("username or password is incorrect")

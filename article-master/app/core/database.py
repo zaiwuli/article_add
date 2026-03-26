@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -21,6 +21,38 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
+def _normalize_database_schema(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    connection.execute(
+        text(
+            """
+            DO $$
+            DECLARE
+                constraint_name text;
+            BEGIN
+                SELECT c.conname
+                INTO constraint_name
+                FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
+                WHERE c.contype = 'u'
+                  AND n.nspname = 'sht'
+                  AND t.relname = 'config'
+                  AND a.attname = 'content'
+                LIMIT 1;
+
+                IF constraint_name IS NOT NULL THEN
+                    EXECUTE format('ALTER TABLE sht.config DROP CONSTRAINT %I', constraint_name);
+                END IF;
+            END $$;
+            """
+        )
+    )
+
+
 def init_database():
     schema_names = sorted(
         {
@@ -34,6 +66,7 @@ def init_database():
         for schema_name in schema_names:
             connection.execute(CreateSchema(schema_name, if_not_exists=True))
         Base.metadata.create_all(bind=connection)
+        _normalize_database_schema(connection)
 
 
 @contextmanager

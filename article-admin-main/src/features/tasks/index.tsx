@@ -12,7 +12,7 @@ export function Tasks() {
       <Header fixed>
         <Search />
         <div className='ms-auto flex items-center space-x-4'>
-          <ImageModeSwitch/>
+          <ImageModeSwitch />
           <ThemeSwitch />
           <ConfigDrawer />
         </div>
@@ -23,14 +23,12 @@ export function Tasks() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>任务调度管理</h2>
             <p className='text-muted-foreground'>
-              配置并监控自动执行的定时任务
+              图形化配置定时任务，按页数和勾选模块安排抓取。
             </p>
           </div>
         </div>
-        <TaskManager/>
+        <TaskManager />
       </Main>
     </>
-
-
   )
 }

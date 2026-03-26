@@ -4,17 +4,34 @@ from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.schemas.response import error, success
 
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = "admin"
+
 
 def has_users(db: Session) -> bool:
     return db.query(User.id).first() is not None
 
 
+def ensure_default_admin_user(db: Session):
+    if has_users(db):
+        return
+
+    user = User(
+        username=DEFAULT_ADMIN_USERNAME,
+        hashed_password=get_password_hash(DEFAULT_ADMIN_PASSWORD),
+    )
+    db.add(user)
+    db.flush()
+
+
 def get_bootstrap_status(db: Session):
-    has_user = has_users(db)
+    ensure_default_admin_user(db)
     return success(
         {
-            "has_user": has_user,
-            "allow_register": not has_user,
+            "has_user": True,
+            "allow_register": False,
+            "default_username": DEFAULT_ADMIN_USERNAME,
+            "default_password": DEFAULT_ADMIN_PASSWORD,
         }
     )
 

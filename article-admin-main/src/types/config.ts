@@ -42,3 +42,16 @@ export interface CrawlerPreviewResult {
   article?: CrawlerPreviewArticle
   runtime: CrawlerRuntimeConfig
 }
+
+export interface CrawlerSaveResult {
+  mode: 'forumdisplay' | 'viewthread'
+  fid?: string | null
+  tid?: number
+  section: string
+  website: string
+  count?: number
+  created?: number
+  updated?: number
+  failed_ids?: number[]
+  action?: 'created' | 'updated'
+}

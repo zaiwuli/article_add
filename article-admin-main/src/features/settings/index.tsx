@@ -1,5 +1,5 @@
 import { Outlet } from '@tanstack/react-router'
-import { Bell, Bug, Settings2, UserPen } from 'lucide-react'
+import { Bell, Settings2, UserPen } from 'lucide-react'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import { Header } from '@/components/layout/header'
@@ -13,11 +13,6 @@ const sidebarNavItems = [
     title: '账户',
     href: '/settings',
     icon: <UserPen size={18} />,
-  },
-  {
-    title: '爬虫中心',
-    href: '/settings/crawler',
-    icon: <Bug size={18} />,
   },
   {
     title: '通知',
@@ -45,7 +40,7 @@ export function Settings() {
             <h1 className='text-3xl font-bold'>系统设置</h1>
           </div>
           <p className='text-muted-foreground'>
-            管理账户、爬虫中心和通知配置。
+            管理账户和通知配置。爬虫中心已经独立到侧边栏单独入口。
           </p>
         </div>
         <TopNav items={sidebarNavItems} />

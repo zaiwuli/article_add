@@ -4,6 +4,8 @@ import { request } from './request'
 export interface BootstrapStatus {
   has_user: boolean
   allow_register: boolean
+  default_username?: string
+  default_password?: string
 }
 
 export function login(data: { username: string; password: string }) {
@@ -26,7 +28,7 @@ export function getBootstrapStatus() {
 
 export function createUser(data: { username: string; password: string }) {
   return request({
-    url: '/users',
+    url: '/users/',
     method: 'post',
     data,
   })
@@ -34,7 +36,7 @@ export function createUser(data: { username: string; password: string }) {
 
 export function updateUser(data: { username: string; password: string }) {
   return request({
-    url: '/users',
+    url: '/users/',
     method: 'put',
     data,
   })

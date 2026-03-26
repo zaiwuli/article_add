@@ -23,7 +23,7 @@ import { PasswordInput } from '@/components/password-input'
 
 const formSchema = z.object({
   username: z.string().min(2, '请输入用户名'),
-  password: z.string().min(8, '密码至少 8 位'),
+  password: z.string().min(5, '密码至少 5 位'),
 })
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
@@ -91,7 +91,7 @@ export function UserAuthForm({
               <FormControl>
                 <PasswordInput
                   autoComplete='current-password'
-                  placeholder='请输入密码'
+                  placeholder='默认密码：admin'
                   {...field}
                 />
               </FormControl>

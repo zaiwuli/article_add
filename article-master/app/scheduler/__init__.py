@@ -15,14 +15,14 @@ TASK_FUNCTIONS = [
         "func_name": "sync_sht_by_tid",
         "func_label": "按最新帖子增量抓取",
         "func_args_description": (
-            '可选 JSON，例如 {"fids":[2,36,160],"start_page":1,"max_page":100}'
+            '图形化参数会自动生成 JSON，例如 {"fids":["2","36","160"],"start_page":1,"max_page":100}'
         ),
     },
     {
         "func_name": "sync_sht_by_max_page",
         "func_label": "按页数批量抓取",
         "func_args_description": (
-            '可选 JSON，例如 {"fids":[2,36,160],"start_page":1,"max_page":5}'
+            '图形化参数会自动生成 JSON，例如 {"fids":["2","36","160"],"start_page":1,"max_page":5}'
         ),
     },
 ]

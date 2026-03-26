@@ -3,7 +3,7 @@ import type { Task } from '@/features/tasks/components/task-manager.tsx'
 import type { TaskFunction } from '@/types/config.ts'
 
 export function getTasks() {
-  return request<Task[]>({ url: '/tasks' })
+  return request<Task[]>({ url: '/tasks/' })
 }
 
 export function getTaskFunctions() {
@@ -11,11 +11,11 @@ export function getTaskFunctions() {
 }
 
 export function addTask(task: Task) {
-  return request({ url: '/tasks', method: 'post', data: task })
+  return request({ url: '/tasks/', method: 'post', data: task })
 }
 
 export function updateTask(task: Task) {
-  return request({ url: '/tasks', method: 'put', data: task })
+  return request({ url: '/tasks/', method: 'put', data: task })
 }
 
 export function deleteTask(task_id: number) {

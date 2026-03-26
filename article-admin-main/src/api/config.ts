@@ -9,7 +9,7 @@ export function getConfig<T>(key: string) {
 
 export function postConfig<T>(key: string, data: T) {
   return request({
-    url: `/config`,
+    url: '/config/',
     method: 'post',
     data: {
       key,

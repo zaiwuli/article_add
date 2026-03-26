@@ -18,15 +18,15 @@ import { PasswordInput } from '@/components/password-input'
 
 const accountSchema = z.object({
   username: z.string().min(2, '用户名至少 2 位'),
-  password: z.string().min(8, '密码至少 8 位'),
+  password: z.string().min(5, '密码至少 5 位'),
 })
 
 export function AccountForm() {
   const account = useForm<z.infer<typeof accountSchema>>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
-      username: '',
-      password: '',
+      username: 'admin',
+      password: 'admin',
     },
   })
 
@@ -63,7 +63,7 @@ export function AccountForm() {
             <FormItem>
               <FormLabel>密码</FormLabel>
               <FormControl>
-                <PasswordInput placeholder='请输入新密码' {...field} />
+                <PasswordInput placeholder='默认密码：admin' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

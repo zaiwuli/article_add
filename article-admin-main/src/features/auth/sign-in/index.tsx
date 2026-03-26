@@ -28,7 +28,15 @@ export function SignIn() {
         <CardHeader>
           <CardTitle className='text-lg tracking-tight'>登录</CardTitle>
           <CardDescription>
-            使用现有账号登录系统。
+            使用现有账号登录系统。默认测试账号：
+            <span className='mx-1 font-medium text-foreground'>
+              {bootstrapStatus?.default_username || 'admin'}
+            </span>
+            /
+            <span className='mx-1 font-medium text-foreground'>
+              {bootstrapStatus?.default_password || 'admin'}
+            </span>
+            。
             {bootstrapStatus?.allow_register && (
               <>
                 {' '}
