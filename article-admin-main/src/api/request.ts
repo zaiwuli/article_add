@@ -17,7 +17,11 @@ export function request<T>(
     })
     .catch((error) => {
       const message =
-        error?.response?.data?.message || error?.message || 'request failed'
+        error?.response?.data?.message ||
+        (error?.message === 'Network Error'
+          ? '无法连接后端接口，请确认后端已启动，且数据库地址可达'
+          : error?.message) ||
+        'request failed'
       toast.error(message)
       throw error
     })

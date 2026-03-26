@@ -57,7 +57,7 @@ export interface Task {
 }
 
 const taskSchema = z.object({
-  task_name: z.string().min(2, '任务名称至少 2 个字符'),
+  task_name: z.string().min(2, '任务名称至少 2 个字'),
   task_func: z.string().min(1, '请选择执行函数'),
   selected_fids: z.array(z.string()).min(1, '至少选择一个模块'),
   start_page: z.number().int().min(1, '起始页必须大于 0'),
@@ -277,7 +277,7 @@ export default function TaskManager() {
             当前任务数 {tasks?.length ?? 0}
           </p>
           <p className='text-sm text-muted-foreground'>
-            任务参数已经改成图形化配置，模块勾选后才会参与抓取。
+            任务参数已经改成图形化配置，只有勾选的模块才会参与抓取。
           </p>
         </div>
 
@@ -287,6 +287,7 @@ export default function TaskManager() {
           onOpenChange={setIsFormOpen}
           trigger={
             <Button
+              type='button'
               onClick={() => setEditingTask(null)}
               className='rounded-full'
             >
@@ -308,7 +309,7 @@ export default function TaskManager() {
                   <FormItem>
                     <FormLabel>任务名称</FormLabel>
                     <FormControl>
-                      <Input placeholder='例如：VR 模块增量抓取' {...field} />
+                      <Input placeholder='例如：VR 模块批量抓取' {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -340,7 +341,7 @@ export default function TaskManager() {
                     </FormControl>
                     <FormDescription>
                       {currentFunction?.func_args_description ||
-                        '先选择抓取模式，再按页数和模块生成任务参数。'}
+                        '先选择抓取模式，再设置页数和抓取模块。'}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -385,9 +386,6 @@ export default function TaskManager() {
                           }
                         />
                       </FormControl>
-                      <FormDescription>
-                        例如输入 5，任务运行时就会按你选中的模块抓取 5 页。
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -433,7 +431,7 @@ export default function TaskManager() {
                         </div>
                       </div>
 
-                      <div className='grid gap-3 rounded-xl border p-4 md:grid-cols-2'>
+                      <div className='grid gap-2 rounded-xl border p-4 md:grid-cols-2'>
                         {(crawlerSections ?? []).length === 0 && (
                           <p className='text-sm text-muted-foreground'>
                             还没有可选模块，请先到爬虫中心配置模块。
@@ -447,7 +445,7 @@ export default function TaskManager() {
                             <label
                               key={section.fid}
                               className={cn(
-                                'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
+                                'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
                                 checked
                                   ? 'border-primary bg-primary/5'
                                   : 'hover:bg-muted/40'
@@ -463,6 +461,7 @@ export default function TaskManager() {
                                     ])
                                     return
                                   }
+
                                   field.onChange(
                                     selectedFids.filter(
                                       (item) => item !== section.fid
@@ -470,14 +469,9 @@ export default function TaskManager() {
                                   )
                                 }}
                               />
-                              <div className='space-y-1'>
-                                <p className='text-sm font-medium'>
-                                  {section.section}
-                                </p>
-                                <p className='text-xs text-muted-foreground'>
-                                  fid: {section.fid} · 站点: {section.website}
-                                </p>
-                              </div>
+                              <span className='text-sm font-medium'>
+                                {section.section}
+                              </span>
                             </label>
                           )
                         })}
@@ -516,7 +510,9 @@ export default function TaskManager() {
                   <FormItem className='flex items-center justify-between rounded-xl border p-3'>
                     <div>
                       <FormLabel>启用任务</FormLabel>
-                      <FormDescription>关闭后任务不会加入调度器。</FormDescription>
+                      <FormDescription>
+                        关闭后任务不会加入调度器。
+                      </FormDescription>
                     </div>
                     <FormControl>
                       <Switch
