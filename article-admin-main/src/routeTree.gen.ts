@@ -26,8 +26,7 @@ import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedArticlesIndexRouteImport } from './routes/_authenticated/articles/index'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
-import { Route as AuthenticatedSettingsFolderRouteImport } from './routes/_authenticated/settings/folder'
-import { Route as AuthenticatedSettingsDownloaderRouteImport } from './routes/_authenticated/settings/downloader'
+import { Route as AuthenticatedSettingsCrawlerRouteImport } from './routes/_authenticated/settings/crawler'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 
@@ -120,16 +119,10 @@ const AuthenticatedSettingsNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedSettingsFolderRoute =
-  AuthenticatedSettingsFolderRouteImport.update({
-    id: '/folder',
-    path: '/folder',
-    getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any)
-const AuthenticatedSettingsDownloaderRoute =
-  AuthenticatedSettingsDownloaderRouteImport.update({
-    id: '/downloader',
-    path: '/downloader',
+const AuthenticatedSettingsCrawlerRoute =
+  AuthenticatedSettingsCrawlerRouteImport.update({
+    id: '/crawler',
+    path: '/crawler',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
 const AuthenticatedSettingsAccountRoute =
@@ -159,8 +152,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/settings/downloader': typeof AuthenticatedSettingsDownloaderRoute
-  '/settings/folder': typeof AuthenticatedSettingsFolderRoute
+  '/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/articles': typeof AuthenticatedArticlesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -180,8 +172,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/settings/downloader': typeof AuthenticatedSettingsDownloaderRoute
-  '/settings/folder': typeof AuthenticatedSettingsFolderRoute
+  '/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/articles': typeof AuthenticatedArticlesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -204,8 +195,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/_authenticated/settings/downloader': typeof AuthenticatedSettingsDownloaderRoute
-  '/_authenticated/settings/folder': typeof AuthenticatedSettingsFolderRoute
+  '/_authenticated/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/articles/': typeof AuthenticatedArticlesIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
@@ -228,8 +218,7 @@ export interface FileRouteTypes {
     | '/'
     | '/errors/$error'
     | '/settings/account'
-    | '/settings/downloader'
-    | '/settings/folder'
+    | '/settings/crawler'
     | '/settings/notifications'
     | '/articles'
     | '/help-center'
@@ -249,8 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/errors/$error'
     | '/settings/account'
-    | '/settings/downloader'
-    | '/settings/folder'
+    | '/settings/crawler'
     | '/settings/notifications'
     | '/articles'
     | '/help-center'
@@ -272,8 +260,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/errors/$error'
     | '/_authenticated/settings/account'
-    | '/_authenticated/settings/downloader'
-    | '/_authenticated/settings/folder'
+    | '/_authenticated/settings/crawler'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/articles/'
     | '/_authenticated/help-center/'
@@ -415,18 +402,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/settings/folder': {
-      id: '/_authenticated/settings/folder'
-      path: '/folder'
-      fullPath: '/settings/folder'
-      preLoaderRoute: typeof AuthenticatedSettingsFolderRouteImport
-      parentRoute: typeof AuthenticatedSettingsRouteRoute
-    }
-    '/_authenticated/settings/downloader': {
-      id: '/_authenticated/settings/downloader'
-      path: '/downloader'
-      fullPath: '/settings/downloader'
-      preLoaderRoute: typeof AuthenticatedSettingsDownloaderRouteImport
+    '/_authenticated/settings/crawler': {
+      id: '/_authenticated/settings/crawler'
+      path: '/crawler'
+      fullPath: '/settings/crawler'
+      preLoaderRoute: typeof AuthenticatedSettingsCrawlerRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
     '/_authenticated/settings/account': {
@@ -448,8 +428,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
-  AuthenticatedSettingsDownloaderRoute: typeof AuthenticatedSettingsDownloaderRoute
-  AuthenticatedSettingsFolderRoute: typeof AuthenticatedSettingsFolderRoute
+  AuthenticatedSettingsCrawlerRoute: typeof AuthenticatedSettingsCrawlerRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
@@ -457,8 +436,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
 const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
   {
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
-    AuthenticatedSettingsDownloaderRoute: AuthenticatedSettingsDownloaderRoute,
-    AuthenticatedSettingsFolderRoute: AuthenticatedSettingsFolderRoute,
+    AuthenticatedSettingsCrawlerRoute: AuthenticatedSettingsCrawlerRoute,
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,

@@ -1,19 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import * as z from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { TaskFunction } from '@/types/config.ts'
-import { Plus, Pencil, Trash2, Clock, Zap, Play } from 'lucide-react'
+import { Clock, Pencil, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
-import { getConfig } from '@/api/config.ts'
-import {
-  addTask,
-  deleteTask,
-  getTasks,
-  runTask,
-  updateTask,
-} from '@/api/task.ts'
+import { addTask, deleteTask, getTaskFunctions, getTasks, runTask, updateTask } from '@/api/task.ts'
+import type { TaskFunction } from '@/types/config.ts'
 import { cn } from '@/lib/utils.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,10 +49,10 @@ export interface Task {
 }
 
 const taskSchema = z.object({
-  task_name: z.string().min(2, '任务名称至少2个字符'),
+  task_name: z.string().min(2, '任务名称至少 2 个字符'),
   task_func: z.string().min(1, '请选择执行函数'),
   task_args: z.string(),
-  task_cron: z.string().min(5, '请输入有效的 Cron 表达式'),
+  task_cron: z.string().min(5, '请输入有效的 cron 表达式'),
   enable: z.boolean(),
 })
 
@@ -72,47 +65,16 @@ export default function TaskManager() {
     queryKey: ['tasks'],
     queryFn: async () => {
       const res = await getTasks()
-      return res.data
+      return res.data ?? []
     },
     staleTime: 5 * 60 * 1000,
   })
 
-  const saveTaskMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof taskSchema>) => {
-      if (editingTask) {
-        return await updateTask({
-          ...values,
-          id: editingTask.id,
-        })
-      } else {
-        return await addTask({
-          ...values,
-          id: 0,
-        })
-      }
-    },
-
-    onSuccess: (res) => {
-      toast.success(res.message)
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      setIsFormOpen(false)
-      setEditingTask(null)
-    },
-  })
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: deleteTask,
-    onSuccess: (res) => {
-      toast.success(res.message)
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
-  })
-
   const { data: taskFunctions } = useQuery({
-    queryKey: ['taskFunc'],
+    queryKey: ['task-functions'],
     queryFn: async () => {
-      const res = await getConfig<TaskFunction[]>('TaskFunction')
-      return res.data
+      const res = await getTaskFunctions()
+      return res.data ?? []
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -128,16 +90,13 @@ export default function TaskManager() {
     },
   })
 
-  const selectedFunc = useWatch({
-    control: form.control,
-    name: 'task_func',
-  })
-
-  // 处理编辑状态回填
   useEffect(() => {
     if (editingTask) {
       form.reset(editingTask)
-    } else if (isFormOpen) {
+      return
+    }
+
+    if (isFormOpen) {
       form.reset({
         task_name: '',
         task_func: '',
@@ -148,14 +107,59 @@ export default function TaskManager() {
     }
   }, [editingTask, isFormOpen, form])
 
-  const handleDelete = async (id: number) => {
+  const selectedFunc = useWatch({
+    control: form.control,
+    name: 'task_func',
+  })
+
+  const saveTaskMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof taskSchema>) => {
+      if (editingTask) {
+        return updateTask({
+          ...values,
+          id: editingTask.id,
+        })
+      }
+
+      return addTask({
+        ...values,
+        id: 0,
+      })
+    },
+    onSuccess: (res) => {
+      if (res.code === 0) {
+        toast.success(res.message)
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        setIsFormOpen(false)
+        setEditingTask(null)
+      }
+    },
+  })
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: (res) => {
+      if (res.code === 0) {
+        toast.success(res.message)
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      }
+    },
+  })
+
+  const handleDelete = (id: number) => {
     deleteTaskMutation.mutate(id)
   }
 
   const handleRunTask = async (taskId: number) => {
     const res = await runTask(taskId)
-    toast.success(res.message)
+    if (res.code === 0) {
+      toast.success('任务已启动')
+    }
   }
+
+  const currentFunction: TaskFunction | undefined = taskFunctions?.find(
+    (item) => item.func_name === selectedFunc
+  )
 
   return (
     <div className='space-y-6'>
@@ -163,11 +167,11 @@ export default function TaskManager() {
         <div className='space-y-1'>
           <p className='flex items-center gap-1 text-xs text-muted-foreground md:text-sm'>
             <Zap className='h-3 w-3 fill-amber-500 text-amber-500' />
-            当前活跃任务: {tasks?.length}
+            当前任务数: {tasks?.length ?? 0}
           </p>
         </div>
         <ResponsiveModal
-          title={editingTask ? '编辑任务' : '创建新任务'}
+          title={editingTask ? '编辑任务' : '新增任务'}
           open={isFormOpen}
           onOpenChange={setIsFormOpen}
           trigger={
@@ -193,7 +197,7 @@ export default function TaskManager() {
                   <FormItem>
                     <FormLabel>任务名称</FormLabel>
                     <FormControl>
-                      <Input placeholder='输入任务名称' {...field} />
+                      <Input placeholder='例如：增量抓取' {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -206,15 +210,12 @@ export default function TaskManager() {
                   <FormItem>
                     <FormLabel>执行函数</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger className='w-full'>
-                          <SelectValue placeholder='选择函数' />
+                          <SelectValue placeholder='选择执行函数' />
                         </SelectTrigger>
                         <SelectContent className='w-full'>
-                          {taskFunctions?.map((f) => (
+                          {(taskFunctions ?? []).map((f) => (
                             <SelectItem key={f.func_name} value={f.func_name}>
                               {f.func_label}
                             </SelectItem>
@@ -222,6 +223,7 @@ export default function TaskManager() {
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -234,18 +236,14 @@ export default function TaskManager() {
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder='{"arg_name":"arg_value"}'
-                      ></Textarea>
+                        placeholder='{"fids":[2,36,160],"start_page":1,"max_page":5}'
+                      />
                     </FormControl>
                     <FormDescription>
-                      <span>
-                        {
-                          taskFunctions?.find(
-                            (f) => f.func_name === selectedFunc
-                          )?.func_args_description
-                        }
-                      </span>
+                      {currentFunction?.func_args_description ||
+                        '支持 JSON 参数，留空则使用默认值。'}
                     </FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -258,16 +256,11 @@ export default function TaskManager() {
                     <FormControl>
                       <div className='relative'>
                         <Input {...field} />
-                        <Clock className='absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                        <Clock className='absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
                       </div>
                     </FormControl>
                     <FormDescription>
-                      <span className='rounded bg-muted px-1.5 py-0.5 italic'>
-                        */5 * * * * (每5分)
-                      </span>
-                      <span className='rounded bg-muted px-1.5 py-0.5 italic'>
-                        0 0 * * * (每日)
-                      </span>
+                      例如 `*/5 * * * *` 表示每 5 分钟执行一次。
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -277,39 +270,41 @@ export default function TaskManager() {
                 control={form.control}
                 name='enable'
                 render={({ field }) => (
-                  <FormItem className='flex items-center justify-between'>
-                    <FormLabel>开启任务</FormLabel>
+                  <FormItem className='flex items-center justify-between rounded-xl border p-3'>
+                    <FormLabel>启用任务</FormLabel>
                     <FormControl>
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type='submit' disabled={saveTaskMutation.isPending} className="w-full">
-                {saveTaskMutation.isPending ? '保存中...' : '保存配置'}
+              <Button
+                type='submit'
+                disabled={saveTaskMutation.isPending}
+                className='w-full'
+              >
+                {saveTaskMutation.isPending ? '保存中...' : '保存任务'}
               </Button>
             </form>
           </Form>
         </ResponsiveModal>
       </div>
+
       <div className='overflow-hidden rounded-2xl border shadow-sm'>
         <Table>
-          {/* 1. 移动端隐藏表头 */}
           <TableHeader className='hidden md:table-header-group'>
             <TableRow>
               <TableHead>任务名称</TableHead>
-              <TableHead>执行逻辑</TableHead>
+              <TableHead>执行函数</TableHead>
               <TableHead>Cron 周期</TableHead>
-              <TableHead className='text-right'>管理</TableHead>
+              <TableHead className='text-right'>操作</TableHead>
             </TableRow>
           </TableHeader>
-
           <TableBody>
-            {tasks?.map((task) => (
+            {(tasks ?? []).map((task) => (
               <TableRow
                 key={task.id}
                 className='group flex flex-col border-b p-4 transition-colors md:table-row md:p-0'
@@ -321,48 +316,52 @@ export default function TaskManager() {
                         'h-2 w-2 rounded-full',
                         task.enable
                           ? 'animate-pulse bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]'
-                          : 'bg-slate-400 shadow-none'
+                          : 'bg-slate-400'
                       )}
                     />
-                    <span className='font-bold text-base md:font-semibold'>{task.task_name}</span>
+                    <span className='text-base font-bold md:font-semibold'>
+                      {task.task_name}
+                    </span>
                   </div>
                 </TableCell>
 
-                <TableCell className='flex items-start justify-between py-2 px-0 md:table-cell md:py-4'>
-                  <span className='text-sm font-medium text-muted-foreground md:hidden'>执行逻辑</span>
+                <TableCell className='flex items-start justify-between px-0 py-2 md:table-cell md:py-4'>
+                  <span className='text-sm font-medium text-muted-foreground md:hidden'>
+                    执行函数
+                  </span>
                   <div className='flex flex-col items-end gap-2 md:flex-row md:items-center'>
                     <Badge variant='outline' className='font-mono'>
                       {task.task_func}
                     </Badge>
-                    <div className='flex items-center gap-2'>
-                      <span className='hidden text-xs text-muted-foreground md:inline'>→</span>
-                      <span className='text-xs text-slate-600 max-w-[200px] truncate md:max-w-none'>
-                {task.task_args}
-              </span>
-                    </div>
+                    <span className='max-w-[200px] truncate text-xs text-slate-600 md:max-w-none'>
+                      {task.task_args || '{}'}
+                    </span>
                   </div>
                 </TableCell>
 
-                <TableCell className='flex items-center justify-between py-2 px-0 md:table-cell md:py-4'>
-                  <span className='text-sm font-medium text-muted-foreground md:hidden'>Cron 周期</span>
+                <TableCell className='flex items-center justify-between px-0 py-2 md:table-cell md:py-4'>
+                  <span className='text-sm font-medium text-muted-foreground md:hidden'>
+                    Cron 周期
+                  </span>
                   <span className='font-mono text-sm text-muted-foreground'>
-            {task.task_cron}
-          </span>
+                    {task.task_cron}
+                  </span>
                 </TableCell>
 
-                <TableCell className='flex justify-end pt-3 px-0 md:table-cell md:pt-4 md:sticky md:right-0'>
-                  <div className='flex gap-1 border-t pt-3 w-full justify-end md:border-none md:pt-0 md:w-auto'>
+                <TableCell className='flex justify-end px-0 pt-3 md:table-cell md:pt-4'>
+                  <div className='flex w-full justify-end gap-1 border-t pt-3 md:w-auto md:border-none md:pt-0'>
                     <Button
                       variant='outline'
                       size='icon'
-                      className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 md:h-8 md:w-8 md:border-none md:bg-transparent"                      onClick={() => handleRunTask(task.id)}
+                      className='h-9 w-9 text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 md:h-8 md:w-8'
+                      onClick={() => handleRunTask(task.id)}
                     >
                       <Play className='h-4 w-4' />
                     </Button>
                     <Button
                       variant='outline'
                       size='icon'
-                      className="h-9 w-9 md:h-8 md:w-8 md:variant-ghost"
+                      className='h-9 w-9 md:h-8 md:w-8'
                       onClick={() => {
                         setEditingTask(task)
                         setIsFormOpen(true)
@@ -373,7 +372,7 @@ export default function TaskManager() {
                     <Button
                       variant='outline'
                       size='icon'
-                      className='h-9 w-9 text-destructive md:h-8 md:w-8 md:variant-ghost'
+                      className='h-9 w-9 text-destructive md:h-8 md:w-8'
                       onClick={() => handleDelete(task.id)}
                     >
                       <Trash2 className='h-4 w-4' />

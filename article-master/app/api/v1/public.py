@@ -1,29 +1,23 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.api.services import article_service
 from app.core.database import get_db
-from app.models.user import User
 from app.schemas.article import ArticleQuery
 
 router = APIRouter()
 
 
-@router.post("/search")
-def get_article_list(
-    query: ArticleQuery,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
+@router.post("/articles/search")
+def get_article_list(query: ArticleQuery, db: Session = Depends(get_db)):
     return article_service.get_article_list(db, query)
 
 
-@router.get("/categories")
+@router.get("/articles/categories")
 def get_category(db: Session = Depends(get_db)):
     return article_service.get_category(db)
 
 
-@router.get("/torrents/")
+@router.get("/articles/torrents")
 def get_torrent(keyword, db: Session = Depends(get_db)):
     return article_service.get_torrents(keyword, db)

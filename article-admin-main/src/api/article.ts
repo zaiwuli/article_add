@@ -27,18 +27,3 @@ export function getArticles(params: {
 export function getCategories() {
   return request<[Category]>({ url: '/articles/categories' })
 }
-
-export function downloadArticle(tid: number) {
-  return request({ url: '/articles/download', params: { tid } })
-}
-
-export function manulDownloadArticle(
-  tid: number,
-  downloader: string,
-  savePath: string
-) {
-  return request({
-    url: '/articles/download/manul',
-    params: { tid, downloader, save_path: savePath },
-  })
-}

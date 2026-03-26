@@ -1,4 +1,6 @@
-import { useSearch } from '@tanstack/react-router'
+import { Link, useSearch } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { getBootstrapStatus } from '@/api/user.ts'
 import {
   Card,
   CardContent,
@@ -11,13 +13,34 @@ import { UserAuthForm } from './components/user-auth-form'
 
 export function SignIn() {
   const { redirect } = useSearch({ from: '/(auth)/sign-in' })
+  const { data: bootstrapStatus } = useQuery({
+    queryKey: ['bootstrap-status'],
+    queryFn: async () => {
+      const res = await getBootstrapStatus()
+      return res.data
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
   return (
     <AuthLayout>
       <Card className='gap-4'>
         <CardHeader>
-          <CardTitle className='text-lg tracking-tight'>登入</CardTitle>
+          <CardTitle className='text-lg tracking-tight'>登录</CardTitle>
           <CardDescription>
+            使用现有账号登录系统。
+            {bootstrapStatus?.allow_register && (
+              <>
+                {' '}
+                还没有账号？
+                <Link
+                  to='/sign-up'
+                  className='underline underline-offset-4 hover:text-primary'
+                >
+                  立即创建
+                </Link>
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>

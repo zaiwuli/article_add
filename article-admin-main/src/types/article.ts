@@ -13,7 +13,6 @@ export interface Article {
   create_time: string
   update_time: string | null
   edk: string | null
-  in_stock: boolean
 }
 
 export interface ArticleFilter {

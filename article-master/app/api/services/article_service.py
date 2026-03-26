@@ -1,31 +1,24 @@
-import json
-import re
 from typing import Dict, List
 
-from sqlalchemy import exists, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.database import session_scope
-from app.models import Config, DownloadLog
 from app.models.article import Article
-from app.modules.downloadclient import downloadManager
 from app.schemas.article import ArticleQuery
-from app.schemas.response import error, success
+from app.schemas.response import success
 
 CN_KEYWORDS: List[str] = [
-    "\u4e2d\u6587\u5b57\u5e55",
-    "\u4e2d\u5b57",
-    "\u5b57\u5e55",
-    "\u4e2d\u6587",
+    "中文字幕",
+    "中字",
+    "字幕",
+    "中文",
 ]
-UC_KEYWORDS: List[str] = ["UC", "\u65e0\u7801", "\u6b65\u5175"]
+UC_KEYWORDS: List[str] = ["UC", "无码", "步兵"]
 UHD_KEYWORDS: List[str] = ["4k", "8k", "2160p", "4K", "8K", "2160P"]
 
 
 def get_article_list(db: Session, query: ArticleQuery) -> Dict:
-    in_stock_expr = exists().where(DownloadLog.tid == Article.tid)
-
-    q = db.query(Article, in_stock_expr.label("in_stock"))
+    q = db.query(Article)
     if query.keyword:
         q = q.filter(Article.title.ilike(f"%{query.keyword}%"))
     if query.section:
@@ -44,12 +37,7 @@ def get_article_list(db: Session, query: ArticleQuery) -> Dict:
     page = query.page
     per_page = query.per_page
     offset = (page - 1) * per_page
-
-    rows = q.order_by(Article.tid.desc()).offset(offset).limit(per_page).all()
-    items = []
-    for article, in_stock in rows:
-        setattr(article, "in_stock", in_stock)
-        items.append(article)
+    items = q.order_by(Article.tid.desc()).offset(offset).limit(per_page).all()
 
     return success(
         {
@@ -121,119 +109,3 @@ def get_category(db: Session):
             )
         grouped[section]["count"] += count
     return success(list(grouped.values()))
-
-
-def calc_score(rule, section, category, title):
-    score = 0
-
-    rule_section = rule.get("category") or "ALL"
-    if rule_section == section:
-        score += 10
-    elif rule_section == "ALL":
-        score += 1
-    else:
-        return 0
-
-    rule_category = rule.get("subCategory") or "ALL"
-    if rule_category == (category or ""):
-        score += 5
-    elif rule_category == "ALL":
-        score += 1
-    else:
-        return 0
-
-    rule_regex = rule.get("regex")
-    if rule_regex:
-        if re.search(rule_regex, title):
-            score += 20
-        else:
-            return 0
-    else:
-        score += 1
-
-    return score
-
-
-def match_best_rules(rules, section, category, title):
-    best_score = 0
-    best_rules = []
-
-    for rule in rules:
-        score = calc_score(rule, section, category, title)
-        if score == 0:
-            continue
-
-        if score > best_score:
-            best_score = score
-            best_rules = [rule]
-        elif score == best_score:
-            best_rules.append(rule)
-
-    return best_rules
-
-
-def download_magnet(tid, magnet, downloader, save_path):
-    is_success = downloadManager.get(f"Downloader.{downloader}").download(
-        magnet,
-        save_path,
-    )
-    if is_success:
-        with session_scope() as db:
-            download_log = DownloadLog()
-            download_log.tid = tid
-            download_log.magnet = magnet
-            download_log.save_path = save_path
-            download_log.downloader = downloader
-            db.add(download_log)
-    return is_success
-
-
-def get_article_by_tid(db: Session, tid: int):
-    return db.query(Article).filter(Article.tid == tid).first()
-
-
-def download_article(tid: int):
-    with session_scope() as db:
-        article = get_article_by_tid(db, tid)
-        config = db.query(Config).filter(Config.key == "DownloadFolder").first()
-
-    if not article:
-        return error("article not found")
-    if not config:
-        return error("download folder rules not configured")
-
-    success_count = 0
-    rules = json.loads(str(config.content))
-    if rules:
-        best_rules = match_best_rules(
-            rules,
-            article.section,
-            article.category,
-            article.title,
-        )
-        for rule in best_rules:
-            is_success = download_magnet(
-                article.tid,
-                article.magnet,
-                rule["downloader"],
-                rule["savePath"],
-            )
-            if is_success:
-                success_count += 1
-
-    if success_count > 0:
-        return success("download task created")
-    return error("failed to create download task")
-
-
-def manul_download(tid, downloader, save_path):
-    with session_scope() as db:
-        article = get_article_by_tid(db, tid)
-
-    if not article:
-        return error("article not found")
-
-    is_success = download_magnet(article.tid, article.magnet, downloader, save_path)
-    if is_success:
-        return success("download task created")
-    return error("failed to create download task")

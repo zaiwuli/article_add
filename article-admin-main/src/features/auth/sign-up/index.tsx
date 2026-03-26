@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { getBootstrapStatus } from '@/api/user.ts'
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -11,46 +12,46 @@ import { AuthLayout } from '../auth-layout'
 import { SignUpForm } from './components/sign-up-form'
 
 export function SignUp() {
+  const { data: bootstrapStatus, isLoading } = useQuery({
+    queryKey: ['bootstrap-status'],
+    queryFn: async () => {
+      const res = await getBootstrapStatus()
+      return res.data
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
   return (
     <AuthLayout>
       <Card className='gap-4'>
         <CardHeader>
-          <CardTitle className='text-lg tracking-tight'>
-            Create an account
-          </CardTitle>
+          <CardTitle className='text-lg tracking-tight'>初始化账号</CardTitle>
           <CardDescription>
-            Enter your email and password to create an account. <br />
-            Already have an account?{' '}
-            <Link
-              to='/sign-in'
-              className='underline underline-offset-4 hover:text-primary'
-            >
-              Sign In
-            </Link>
+            {isLoading
+              ? '正在检查系统是否已存在账号...'
+              : bootstrapStatus?.allow_register
+              ? '系统还没有管理员账号，先创建第一个登录账户。'
+              : '系统已经存在账户，不能再次使用初始化注册。'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SignUpForm />
+          {isLoading ? (
+            <p className='text-sm text-muted-foreground'>正在加载...</p>
+          ) : bootstrapStatus?.allow_register ? (
+            <SignUpForm />
+          ) : (
+            <p className='text-sm text-muted-foreground'>
+              请直接前往
+              <Link
+                to='/sign-in'
+                className='ml-1 underline underline-offset-4 hover:text-primary'
+              >
+                登录页
+              </Link>
+              。
+            </p>
+          )}
         </CardContent>
-        <CardFooter>
-          <p className='px-8 text-center text-sm text-muted-foreground'>
-            By creating an account, you agree to our{' '}
-            <a
-              href='/terms'
-              className='underline underline-offset-4 hover:text-primary'
-            >
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a
-              href='/privacy'
-              className='underline underline-offset-4 hover:text-primary'
-            >
-              Privacy Policy
-            </a>
-            .
-          </p>
-        </CardFooter>
       </Card>
     </AuthLayout>
   )

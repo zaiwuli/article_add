@@ -25,15 +25,12 @@ const telegramSchema = z.object({
 })
 
 export function TelegramNotificationForm() {
-  const tgTemplate = `🚀 {{title}}
+  const tgTemplate = `{{title}}
 
-📁 板块：{{section}} / {{category}}
-📦 体积：{{size}}
-🗓 发布：{{publish_date}}
-⬇️ 下载器：{{downloader}}
-📂 保存目录：{{save_path}}
-🔗 Magnet：
-{{magnet}}`
+板块：{{section}} / {{category}}
+大小：{{size}}
+发布时间：{{publish_date}}
+Magnet：{{magnet}}`
 
   const form = useForm({
     resolver: zodResolver(telegramSchema),
@@ -62,7 +59,7 @@ export function TelegramNotificationForm() {
           name='enable'
           render={({ field }) => (
             <FormItem className='flex items-center justify-between'>
-              <FormLabel>启用telegram通知</FormLabel>
+              <FormLabel>启用 Telegram 通知</FormLabel>
               <FormControl>
                 <Switch
                   checked={field.value}
@@ -78,7 +75,7 @@ export function TelegramNotificationForm() {
           name='push_image'
           render={({ field }) => (
             <FormItem className='flex items-center justify-between'>
-              <FormLabel>启用图片推送</FormLabel>
+              <FormLabel>推送图片</FormLabel>
               <FormControl>
                 <Switch
                   checked={field.value}
@@ -94,7 +91,7 @@ export function TelegramNotificationForm() {
           name='spoiler'
           render={({ field }) => (
             <FormItem className='flex items-center justify-between'>
-              <FormLabel>启用防剧透</FormLabel>
+              <FormLabel>启用 spoiler</FormLabel>
               <FormControl>
                 <Switch
                   checked={field.value}

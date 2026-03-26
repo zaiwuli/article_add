@@ -29,13 +29,10 @@ const wechatSchema = z.object({
 })
 
 export function WechatNotificationForm() {
-  const wxTemplate = `📁 板块：{{section}} / {{category}}
-📦 体积：{{size}}
-🗓 发布：{{publish_date}}
-⬇️ 下载器：{{downloader}}
-📂 保存目录：{{save_path}}
-🔗 Magnet：
-{{magnet}}`
+  const wxTemplate = `板块：{{section}} / {{category}}
+大小：{{size}}
+发布时间：{{publish_date}}
+Magnet：{{magnet}}`
 
   const form = useForm({
     resolver: zodResolver(wechatSchema),

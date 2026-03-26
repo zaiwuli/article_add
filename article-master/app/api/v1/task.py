@@ -12,6 +12,11 @@ from app.schemas.task import TaskForm
 router = APIRouter()
 
 
+@router.get('/functions')
+def list_task_functions(user: User = Depends(get_current_user)):
+    return task_service.list_task_functions()
+
+
 @router.get('/')
 def list_task(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return task_service.list_task(db)

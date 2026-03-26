@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { IconFacebook, IconGithub } from '@/assets/brand-icons'
+import { Link } from '@tanstack/react-router'
+import { Loader2, UserPlus } from 'lucide-react'
+import { toast } from 'sonner'
+import { createUser, login } from '@/api/user.ts'
+import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,18 +22,12 @@ import { PasswordInput } from '@/components/password-input'
 
 const formSchema = z
   .object({
-    email: z.email({
-      error: (iss) =>
-        iss.input === '' ? 'Please enter your email' : undefined,
-    }),
-    password: z
-      .string()
-      .min(1, 'Please enter your password')
-      .min(7, 'Password must be at least 7 characters long'),
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    username: z.string().min(2, '用户名至少 2 位'),
+    password: z.string().min(8, '密码至少 8 位'),
+    confirmPassword: z.string().min(8, '请再次输入密码'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
+    message: '两次输入的密码不一致',
     path: ['confirmPassword'],
   })
 
@@ -38,24 +36,42 @@ export function SignUpForm({
   ...props
 }: React.HTMLAttributes<HTMLFormElement>) {
   const [isLoading, setIsLoading] = useState(false)
+  const { auth } = useAuthStore()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
       confirmPassword: '',
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    // eslint-disable-next-line no-console
-    console.log(data)
+    try {
+      const createRes = await createUser({
+        username: data.username,
+        password: data.password,
+      })
+      if (createRes.code !== 0) {
+        return
+      }
 
-    setTimeout(() => {
+      const loginRes = await login({
+        username: data.username,
+        password: data.password,
+      })
+      if (loginRes.code !== 0 || !loginRes.data?.access_token) {
+        return
+      }
+
+      auth.setAccessToken(loginRes.data.access_token)
+      toast.success('账号已创建')
+      window.location.replace('/')
+    } finally {
       setIsLoading(false)
-    }, 3000)
+    }
   }
 
   return (
@@ -67,12 +83,12 @@ export function SignUpForm({
       >
         <FormField
           control={form.control}
-          name='email'
+          name='username'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>用户名</FormLabel>
               <FormControl>
-                <Input placeholder='name@example.com' {...field} />
+                <Input autoComplete='username' placeholder='admin' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -83,9 +99,13 @@ export function SignUpForm({
           name='password'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>密码</FormLabel>
               <FormControl>
-                <PasswordInput placeholder='********' {...field} />
+                <PasswordInput
+                  autoComplete='new-password'
+                  placeholder='请输入密码'
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -96,47 +116,31 @@ export function SignUpForm({
           name='confirmPassword'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
+              <FormLabel>确认密码</FormLabel>
               <FormControl>
-                <PasswordInput placeholder='********' {...field} />
+                <PasswordInput
+                  autoComplete='new-password'
+                  placeholder='请再次输入密码'
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button className='mt-2' disabled={isLoading}>
-          Create Account
+          {isLoading ? <Loader2 className='animate-spin' /> : <UserPlus />}
+          创建账号
         </Button>
-
-        <div className='relative my-2'>
-          <div className='absolute inset-0 flex items-center'>
-            <span className='w-full border-t' />
-          </div>
-          <div className='relative flex justify-center text-xs uppercase'>
-            <span className='bg-background px-2 text-muted-foreground'>
-              Or continue with
-            </span>
-          </div>
-        </div>
-
-        <div className='grid grid-cols-2 gap-2'>
-          <Button
-            variant='outline'
-            className='w-full'
-            type='button'
-            disabled={isLoading}
+        <p className='text-center text-sm text-muted-foreground'>
+          已有账号？
+          <Link
+            to='/sign-in'
+            className='ml-1 underline underline-offset-4 hover:text-primary'
           >
-            <IconGithub className='h-4 w-4' /> GitHub
-          </Button>
-          <Button
-            variant='outline'
-            className='w-full'
-            type='button'
-            disabled={isLoading}
-          >
-            <IconFacebook className='h-4 w-4' /> Facebook
-          </Button>
-        </div>
+            去登录
+          </Link>
+        </p>
       </form>
     </Form>
   )

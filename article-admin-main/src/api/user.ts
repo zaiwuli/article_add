@@ -1,6 +1,11 @@
 import type { User } from '@/types/user.ts'
 import { request } from './request'
 
+export interface BootstrapStatus {
+  has_user: boolean
+  allow_register: boolean
+}
+
 export function login(data: { username: string; password: string }) {
   return request<User>({
     url: '/users/login',
@@ -8,24 +13,29 @@ export function login(data: { username: string; password: string }) {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    data: data,
+    data,
   })
 }
 
-export function create_user(params: { username: string; password: string }) {
+export function getBootstrapStatus() {
+  return request<BootstrapStatus>({
+    url: '/users/bootstrap-status',
+    method: 'get',
+  })
+}
+
+export function createUser(data: { username: string; password: string }) {
   return request({
     url: '/users',
     method: 'post',
-    params,
+    data,
   })
 }
 
-
-
-export function update_user(params: { username: string; password: string }) {
+export function updateUser(data: { username: string; password: string }) {
   return request({
     url: '/users',
     method: 'put',
-    params,
+    data,
   })
 }
