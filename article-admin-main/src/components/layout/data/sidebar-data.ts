@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   Bug,
   Database,
   LayoutDashboard,
@@ -42,6 +43,11 @@ export const sidebarData: SidebarData = {
           title: '资源接口',
           url: '/api-center',
           icon: Waypoints,
+        },
+        {
+          title: '转存中心',
+          url: '/transfer',
+          icon: ArrowRightLeft,
         },
       ],
     },

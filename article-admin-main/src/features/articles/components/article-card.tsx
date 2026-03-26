@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Article } from '@/types/article'
+import type { Article, ArticleMultiValue } from '@/types/article'
 import {
   ChevronLeft,
   ChevronRight,
@@ -25,49 +25,43 @@ interface ArticleCardProps {
   article: Article
 }
 
-function normalizeValues(
-  value: string | string[] | null | undefined,
-  options?: { splitComma?: boolean }
-) {
+function normalizeList(value: ArticleMultiValue): string[] {
+  if (!value) {
+    return []
+  }
   if (Array.isArray(value)) {
-    return value.map((item) => item.trim()).filter(Boolean)
+    return value.filter(Boolean)
   }
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
 
-  if (typeof value === 'string') {
-    const raw = value.trim()
-    if (!raw) {
-      return []
-    }
-
-    if (options?.splitComma) {
-      return raw
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    }
-
-    return [raw]
-  }
-
-  return []
+function firstValue(value: ArticleMultiValue): string {
+  return normalizeList(value)[0] || ''
 }
 
 export function ArticleCard({ article }: ArticleCardProps) {
   const { mode } = useImageMode()
-  const images = normalizeValues(article.preview_images, { splitComma: true })
-  const magnetLinks = normalizeValues(article.magnet)
-  const edkLinks = normalizeValues(article.edk)
-  const primaryMagnet = magnetLinks[0] || ''
+  const images = normalizeList(article.preview_images)
+  const magnet = firstValue(article.magnet)
+  const edk = firstValue(article.edk)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const activeImage = images[currentIndex] || images[0] || ''
   const [imageError, setImageError] = useState(false)
+  const activeImage = images[currentIndex] || images[0] || ''
 
   const handleCopy = async (value: string, successMessage: string) => {
+    if (!value) {
+      toast.error('当前没有可复制的内容')
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(value)
       toast.success(successMessage)
-    } catch (err) {
-      toast.error(`复制失败，请重试: ${err}`)
+    } catch (error) {
+      toast.error(`复制失败，请重试：${error}`)
     }
   }
 
@@ -153,6 +147,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
             {images.map((img, index) => (
               <button
                 key={`${article.tid}-${index}`}
+                type='button'
                 onClick={() => setCurrentIndex(index)}
                 className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
                   currentIndex === index
@@ -200,9 +195,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
 
         <div className='mt-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
           <span className='rounded-full border px-2.5 py-1'>{article.website}</span>
-          {edkLinks.length > 0 && (
-            <span className='rounded-full border px-2.5 py-1'>ED2K</span>
-          )}
+          {edk && <span className='rounded-full border px-2.5 py-1'>ED2K</span>}
           {article.detail_url && (
             <a
               href={article.detail_url}
@@ -224,10 +217,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
               <Button
                 size='sm'
                 className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
-                disabled={!primaryMagnet}
-                onClick={() =>
-                  handleCopy(magnetLinks.join('\n'), '磁力链接已复制')
-                }
+                onClick={() => handleCopy(magnet, '磁力链接已复制')}
               >
                 <Copy className='h-4 w-4' />
                 <span className='hidden sm:inline'>复制 Magnet</span>
@@ -240,7 +230,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           </Tooltip>
         </TooltipProvider>
 
-        {edkLinks.length > 0 && (
+        {edk && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -248,7 +238,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
                   size='sm'
                   variant='outline'
                   className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
-                  onClick={() => handleCopy(edkLinks.join('\n'), 'ED2K 已复制')}
+                  onClick={() => handleCopy(edk, 'ED2K 链接已复制')}
                 >
                   <Link2 className='h-4 w-4' />
                   <span className='hidden sm:inline'>复制 ED2K</span>

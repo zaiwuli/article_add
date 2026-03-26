@@ -57,26 +57,3 @@ export interface CrawlerSaveResult {
   failed_ids?: number[]
   action?: 'created' | 'updated'
 }
-
-export interface TransferDatabaseConfig {
-  database_url: string
-  table_name: string
-}
-
-export interface TransferTableInfo {
-  schema?: string | null
-  name: string
-  qualified_name: string
-}
-
-export interface TransferTableResult {
-  dialect: string
-  tables: TransferTableInfo[]
-}
-
-export interface TransferArticleResult {
-  table_name: string
-  total: number
-  inserted: number
-  updated: number
-}

@@ -2,8 +2,6 @@ import { request } from './request'
 import type {
   CrawlerPreviewResult,
   CrawlerSaveResult,
-  TransferArticleResult,
-  TransferTableResult,
 } from '@/types/config.ts'
 
 export function previewCrawlerUrl(url: string) {
@@ -40,24 +38,5 @@ export function resetCrawlerTestSpace() {
   }>({
     url: '/crawler/reset-test-space',
     method: 'post',
-  })
-}
-
-export function getCrawlerTransferTables(payload: { database_url: string }) {
-  return request<TransferTableResult>({
-    url: '/crawler/transfer/tables',
-    method: 'post',
-    data: payload,
-  })
-}
-
-export function transferCrawlerArticles(payload: {
-  database_url: string
-  table_name: string
-}) {
-  return request<TransferArticleResult>({
-    url: '/crawler/transfer/articles',
-    method: 'post',
-    data: payload,
   })
 }

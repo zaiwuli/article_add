@@ -15,114 +15,13 @@ SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine,
-    expire_on_commit=False
+    expire_on_commit=False,
 )
 
 Base = declarative_base()
 
-ARTICLE_SCHEMA = "sht"
-ARTICLE_TABLE = "article"
-ARTICLE_ARRAY_COLUMNS = {
-    "magnet": False,
-    "preview_images": True,
-    "edk": False,
-}
 
-
-def _get_column_udt_name(connection, schema_name: str, table_name: str, column_name: str):
-    return connection.execute(
-        text(
-            """
-            SELECT udt_name
-            FROM information_schema.columns
-            WHERE table_schema = :schema_name
-              AND table_name = :table_name
-              AND column_name = :column_name
-            """
-        ),
-        {
-            "schema_name": schema_name,
-            "table_name": table_name,
-            "column_name": column_name,
-        },
-    ).scalar()
-
-
-def _ensure_article_text_column(connection, column_name: str):
-    if not _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name):
-        return
-
-    connection.execute(
-        text(
-            f'''
-            ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
-            ALTER COLUMN "{column_name}" TYPE TEXT
-            '''
-        )
-    )
-
-
-def _ensure_article_array_column(
-    connection,
-    column_name: str,
-    *,
-    split_commas: bool = False,
-):
-    if not _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name):
-        return
-
-    using_expression = (
-        f"""
-        CASE
-            WHEN "{column_name}" IS NULL OR btrim("{column_name}") = '' THEN ARRAY[]::TEXT[]
-            WHEN left("{column_name}", 1) = '{{' AND right("{column_name}", 1) = '}}' THEN "{column_name}"::TEXT[]
-            ELSE array_remove(regexp_split_to_array("{column_name}", E'\\s*,\\s*'), '')
-        END
-        """
-        if split_commas
-        else f"""
-        CASE
-            WHEN "{column_name}" IS NULL OR btrim("{column_name}") = '' THEN ARRAY[]::TEXT[]
-            WHEN left("{column_name}", 1) = '{{' AND right("{column_name}", 1) = '}}' THEN "{column_name}"::TEXT[]
-            ELSE ARRAY["{column_name}"]
-        END
-        """
-    )
-
-    if _get_column_udt_name(connection, ARTICLE_SCHEMA, ARTICLE_TABLE, column_name) != "_text":
-        connection.execute(
-            text(
-                f'''
-                ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
-                ALTER COLUMN "{column_name}" TYPE TEXT[] USING {using_expression}
-                '''
-            )
-        )
-
-    connection.execute(
-        text(
-            f'''
-            UPDATE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
-            SET "{column_name}" = ARRAY[]::TEXT[]
-            WHERE "{column_name}" IS NULL
-            '''
-        )
-    )
-    connection.execute(
-        text(
-            f'''
-            ALTER TABLE "{ARTICLE_SCHEMA}"."{ARTICLE_TABLE}"
-            ALTER COLUMN "{column_name}" SET DEFAULT ARRAY[]::TEXT[],
-            ALTER COLUMN "{column_name}" SET NOT NULL
-            '''
-        )
-    )
-
-
-def _normalize_database_schema(connection):
-    if connection.dialect.name != "postgresql":
-        return
-
+def _normalize_config_schema(connection):
     connection.execute(
         text(
             """
@@ -150,15 +49,89 @@ def _normalize_database_schema(connection):
         )
     )
 
-    if connection.execute(text("SELECT to_regclass('sht.article')")).scalar():
-        _ensure_article_text_column(connection, "title")
-        _ensure_article_text_column(connection, "detail_url")
-        for column_name, split_commas in ARTICLE_ARRAY_COLUMNS.items():
-            _ensure_article_array_column(
-                connection,
-                column_name,
-                split_commas=split_commas,
-            )
+
+def _normalize_article_schema(connection):
+    connection.execute(
+        text(
+            """
+            DO $$
+            DECLARE
+                magnet_type text;
+                edk_type text;
+                preview_type text;
+            BEGIN
+                SELECT data_type INTO magnet_type
+                FROM information_schema.columns
+                WHERE table_schema = 'sht'
+                  AND table_name = 'article'
+                  AND column_name = 'magnet';
+
+                SELECT data_type INTO edk_type
+                FROM information_schema.columns
+                WHERE table_schema = 'sht'
+                  AND table_name = 'article'
+                  AND column_name = 'edk';
+
+                SELECT data_type INTO preview_type
+                FROM information_schema.columns
+                WHERE table_schema = 'sht'
+                  AND table_name = 'article'
+                  AND column_name = 'preview_images';
+
+                IF magnet_type IS NOT NULL AND magnet_type <> 'ARRAY' THEN
+                    EXECUTE $sql$
+                        ALTER TABLE sht.article
+                        ALTER COLUMN magnet TYPE text[]
+                        USING CASE
+                            WHEN magnet IS NULL OR btrim(magnet) = '' THEN ARRAY[]::text[]
+                            WHEN left(magnet, 1) = '{' AND right(magnet, 1) = '}' THEN magnet::text[]
+                            ELSE ARRAY[magnet]
+                        END
+                    $sql$;
+                END IF;
+
+                IF edk_type IS NOT NULL AND edk_type <> 'ARRAY' THEN
+                    EXECUTE $sql$
+                        ALTER TABLE sht.article
+                        ALTER COLUMN edk TYPE text[]
+                        USING CASE
+                            WHEN edk IS NULL OR btrim(edk) = '' THEN ARRAY[]::text[]
+                            WHEN left(edk, 1) = '{' AND right(edk, 1) = '}' THEN edk::text[]
+                            ELSE ARRAY[edk]
+                        END
+                    $sql$;
+                END IF;
+
+                IF preview_type IS NOT NULL AND preview_type <> 'ARRAY' THEN
+                    EXECUTE $sql$
+                        ALTER TABLE sht.article
+                        ALTER COLUMN preview_images TYPE text[]
+                        USING CASE
+                            WHEN preview_images IS NULL OR btrim(preview_images) = '' THEN ARRAY[]::text[]
+                            WHEN left(preview_images, 1) = '{' AND right(preview_images, 1) = '}' THEN preview_images::text[]
+                            ELSE array_remove(string_to_array(preview_images, ','), '')
+                        END
+                    $sql$;
+                END IF;
+
+                EXECUTE $sql$
+                    ALTER TABLE sht.article
+                    ALTER COLUMN magnet SET DEFAULT ARRAY[]::text[],
+                    ALTER COLUMN edk SET DEFAULT ARRAY[]::text[],
+                    ALTER COLUMN preview_images SET DEFAULT ARRAY[]::text[]
+                $sql$;
+            END $$;
+            """
+        )
+    )
+
+
+def _normalize_database_schema(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    _normalize_config_schema(connection)
+    _normalize_article_schema(connection)
 
 
 def init_database():
@@ -183,8 +156,8 @@ def session_scope() -> Generator:
     try:
         yield session
         session.commit()
-    except SQLAlchemyError as e:
-        logger.error(f"数据库操作失败：{str(e)}")
+    except SQLAlchemyError as exc:
+        logger.error(f"数据库操作失败：{str(exc)}")
         raise
     finally:
         if session.is_active:
@@ -197,8 +170,8 @@ def get_db():
     try:
         yield session
         session.commit()
-    except SQLAlchemyError as e:
-        logger.error(f"数据库操作失败：{str(e)}")
+    except SQLAlchemyError as exc:
+        logger.error(f"数据库操作失败：{str(exc)}")
         raise
     finally:
         if session.is_active:

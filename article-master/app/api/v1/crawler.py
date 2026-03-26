@@ -8,8 +8,6 @@ from app.models import User
 from app.schemas.crawler import (
     CrawlerPreviewPayload,
     CrawlerSavePayload,
-    TransferArticlePayload,
-    TransferTablePayload,
 )
 
 router = APIRouter()
@@ -30,27 +28,6 @@ def save_crawler_url(
     user: User = Depends(get_current_user),
 ):
     return crawler_service.save_url(payload.url, db=db, fid=payload.fid)
-
-
-@router.post("/transfer/tables")
-def list_transfer_tables(
-    payload: TransferTablePayload,
-    user: User = Depends(get_current_user),
-):
-    return crawler_service.list_transfer_tables(payload.database_url)
-
-
-@router.post("/transfer/articles")
-def transfer_articles(
-    payload: TransferArticlePayload,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    return crawler_service.transfer_articles(
-        payload.database_url,
-        payload.table_name,
-        db=db,
-    )
 
 
 @router.post("/reset-resource-table")

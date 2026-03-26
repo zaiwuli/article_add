@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, Iterable, List
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -17,10 +17,23 @@ UC_KEYWORDS: List[str] = ["UC", "无码", "步兵"]
 UHD_KEYWORDS: List[str] = ["4k", "8k", "2160p", "4K", "8K", "2160P"]
 
 
-def _first_value(value):
+def normalize_string_list(value) -> List[str]:
+    if value is None:
+        return []
     if isinstance(value, list):
-        return value[0] if value else ""
-    return value or ""
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, tuple):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        return [item.strip() for item in stripped.split(",") if item.strip()]
+    return [str(value).strip()]
+
+
+def join_search_text(parts: Iterable[str]) -> str:
+    return "".join(part for part in parts if part)
 
 
 def get_article_list(db: Session, query: ArticleQuery) -> Dict:
@@ -73,7 +86,10 @@ def get_torrents(keyword, db: Session) -> Dict:
     articles = db.query(Article).filter(Article.title.ilike(f"%{keyword}%")).all()
     torrents = []
     for article in articles:
-        search_text = f"{article.title}{article.section}{article.category or ''}"
+        magnet_list = normalize_string_list(article.magnet)
+        search_text = join_search_text(
+            [article.title, article.section, article.category or ""]
+        )
         torrents.append(
             {
                 "id": article.tid,
@@ -81,7 +97,7 @@ def get_torrents(keyword, db: Session) -> Dict:
                 "size_mb": article.size,
                 "seeders": 66,
                 "title": article.title,
-                "download_url": _first_value(article.magnet),
+                "download_url": magnet_list[0] if magnet_list else "",
                 "free": True,
                 "chinese": has_chinese(search_text),
                 "uc": has_uc(search_text),

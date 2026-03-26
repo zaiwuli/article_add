@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { CrawlerForm } from '@/features/settings/crawler/crawler-form.tsx'
+import { CrawlerForm } from '@/features/settings/crawler/crawler-form'
 
 export function CrawlerCenter() {
   return (
@@ -33,7 +33,8 @@ export function CrawlerCenter() {
             <h1 className='text-2xl font-bold'>爬虫中心</h1>
           </div>
           <p className='max-w-2xl text-sm text-muted-foreground'>
-            这里统一维护爬虫模块、网络代理，以及抓取结果转存到其他数据库的目标连接。
+            这里专门维护爬虫模块和网络配置。抓取任务会直接读取这些配置，不再
+            混入转存、重置和其他维护操作。
           </p>
         </div>
 
@@ -41,7 +42,7 @@ export function CrawlerCenter() {
           <CardHeader className='pb-4'>
             <CardTitle>爬虫配置</CardTitle>
             <CardDescription>
-              页面里只保留配置项，不再混入手动抓取、重置和其他维护操作。
+              配置抓取模块、代理和 FlareSolverR。任务执行时会自动读取这里的值。
             </CardDescription>
           </CardHeader>
           <CardContent>
