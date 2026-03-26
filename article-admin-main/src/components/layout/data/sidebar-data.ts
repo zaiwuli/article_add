@@ -1,9 +1,10 @@
 import {
+  Bug,
+  Database,
+  HelpCircle,
   LayoutDashboard,
   ListTodo,
-  HelpCircle,
   Settings,
-  Newspaper
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -27,20 +28,24 @@ export const sidebarData: SidebarData = {
           icon: ListTodo,
         },
         {
-          title: '文章',
+          title: '资源数据',
           url: '/articles',
-          icon: Newspaper,
+          icon: Database,
+        },
+        {
+          title: '爬虫',
+          url: '/settings/crawler',
+          icon: Bug,
         },
       ],
     },
     {
-      title: 'Other',
+      title: '其他',
       items: [
         {
           title: '设置',
           url: '/settings',
           icon: Settings,
-
         },
         {
           title: '帮助中心',

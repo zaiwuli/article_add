@@ -1,4 +1,3 @@
-
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -15,11 +14,10 @@ export function AppTitle() {
           asChild
         >
           <div>
-            <span className='truncate font-bold'>文章管理</span>
+            <span className='truncate font-bold'>资源管理</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
   )
 }
-

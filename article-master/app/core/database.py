@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import CreateSchema
 
 from app.core import settings
 from app.utils.log import logger
@@ -18,6 +19,21 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+
+def init_database():
+    schema_names = sorted(
+        {
+            table.schema
+            for table in Base.metadata.tables.values()
+            if table.schema
+        }
+    )
+
+    with engine.begin() as connection:
+        for schema_name in schema_names:
+            connection.execute(CreateSchema(schema_name, if_not_exists=True))
+        Base.metadata.create_all(bind=connection)
 
 
 @contextmanager

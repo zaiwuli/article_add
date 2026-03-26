@@ -15,7 +15,7 @@ const sidebarNavItems = [
     icon: <UserPen size={18} />,
   },
   {
-    title: '爬虫板块',
+    title: '爬虫中心',
     href: '/settings/crawler',
     icon: <Bug size={18} />,
   },
@@ -45,7 +45,7 @@ export function Settings() {
             <h1 className='text-3xl font-bold'>系统设置</h1>
           </div>
           <p className='text-muted-foreground'>
-            管理账户、爬虫板块和通知配置。
+            管理账户、爬虫中心和通知配置。
           </p>
         </div>
         <TopNav items={sidebarNavItems} />

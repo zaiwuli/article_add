@@ -13,16 +13,16 @@ scheduler = AsyncIOScheduler()
 TASK_FUNCTIONS = [
     {
         "func_name": "sync_sht_by_tid",
-        "func_label": "Incremental crawl",
+        "func_label": "按最新帖子增量抓取",
         "func_args_description": (
-            'Optional JSON, e.g. {"fids":[2,36,160],"start_page":1,"max_page":100}'
+            '可选 JSON，例如 {"fids":[2,36,160],"start_page":1,"max_page":100}'
         ),
     },
     {
         "func_name": "sync_sht_by_max_page",
-        "func_label": "Paged crawl",
+        "func_label": "按页数批量抓取",
         "func_args_description": (
-            'Optional JSON, e.g. {"fids":[2,36,160],"start_page":1,"max_page":5}'
+            '可选 JSON，例如 {"fids":[2,36,160],"start_page":1,"max_page":5}'
         ),
     },
 ]

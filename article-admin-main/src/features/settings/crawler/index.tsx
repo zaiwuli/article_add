@@ -5,8 +5,8 @@ import { CrawlerForm } from './crawler-form'
 export function SettingsCrawler() {
   return (
     <ContentSection
-      title='爬虫板块'
-      desc='维护可抓取的板块列表，新增板块后任务可直接按 fid 抓取。'
+      title='爬虫中心'
+      desc='管理抓取板块、代理网络、FlareSolverR 和手动抓取预览。'
       icon={<Bug className='h-5 w-5 text-primary' />}
     >
       <CrawlerForm />

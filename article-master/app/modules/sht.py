@@ -1,5 +1,6 @@
 import binascii
 import hashlib
+import json
 import re
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -9,7 +10,18 @@ from curl_cffi import requests
 from pyquery import PyQuery as pq
 
 from app.core import settings
+from app.core.database import session_scope
+from app.models import Config
 from app.utils.log import logger
+
+CRAWLER_RUNTIME_CONFIG_KEY = "CrawlerRuntime"
+
+
+def get_default_runtime_config():
+    return {
+        "proxy": settings.PROXY or "",
+        "flare_solver_url": settings.FLARE_SOLVERR_URL or "",
+    }
 
 
 def extract_and_convert_video_size(html_content):
@@ -109,13 +121,48 @@ class SHT:
         )
         self.headers = {"User-Agent": ua}
         self.cookie = {"_safe": ""}
-        self.proxies = {
-            "http": settings.PROXY,
-            "https": settings.PROXY,
-        }
-        self.flare_solver = settings.FLARE_SOLVERR_URL
+        self.apply_runtime_config(get_default_runtime_config())
+
+    def apply_runtime_config(self, runtime_config):
+        proxy = (runtime_config.get("proxy") or "").strip()
+        self.proxy = proxy or None
+        self.proxies = (
+            {
+                "http": proxy,
+                "https": proxy,
+            }
+            if proxy
+            else None
+        )
+        self.flare_solver = (runtime_config.get("flare_solver_url") or "").strip() or None
+
+    def get_runtime_config(self):
+        runtime_config = get_default_runtime_config()
+        try:
+            with session_scope() as session:
+                config = (
+                    session.query(Config)
+                    .filter(Config.key == CRAWLER_RUNTIME_CONFIG_KEY)
+                    .first()
+                )
+            if config and config.content:
+                payload = json.loads(str(config.content))
+                if isinstance(payload, dict):
+                    if "proxy" in payload:
+                        runtime_config["proxy"] = payload.get("proxy") or ""
+                    if "flare_solver_url" in payload:
+                        runtime_config["flare_solver_url"] = (
+                            payload.get("flare_solver_url") or ""
+                        )
+        except Exception as exc:
+            logger.warning(f"failed to load crawler runtime config: {exc}")
+        return runtime_config
+
+    def refresh_runtime_config(self):
+        self.apply_runtime_config(self.get_runtime_config())
 
     def get_original(self, url):
+        self.refresh_runtime_config()
         res = requests.get(
             url,
             proxies=self.proxies,
@@ -153,16 +200,21 @@ class SHT:
         return None
 
     def bypass_cf(self, url):
+        if not self.flare_solver:
+            logger.error("flare solver is not configured")
+            return None
+
         payload = {
             "cmd": "request.get",
             "url": url,
             "maxTimeout": 60000,
-            "proxy": {"url": self.proxies["http"]},
             "cookies": [
                 {"name": key, "value": value}
                 for key, value in self.cookie.items()
             ],
         }
+        if self.proxy:
+            payload["proxy"] = {"url": self.proxy}
         res = requests.post(
             self.flare_solver,
             headers={"Content-Type": "application/json"},

@@ -7,12 +7,12 @@ export function getConfig<T>(key: string) {
   })
 }
 
-export function postConfig(key: string, data: never) {
+export function postConfig<T>(key: string, data: T) {
   return request({
     url: `/config`,
     method: 'post',
     data: {
-      key: key,
+      key,
       payload: data,
     },
   })

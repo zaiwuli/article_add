@@ -9,3 +9,36 @@ export interface CrawlerSection {
   section: string
   website: string
 }
+
+export interface CrawlerRuntimeConfig {
+  proxy: string
+  flare_solver_url: string
+}
+
+export interface CrawlerPreviewArticle {
+  tid?: string | null
+  title: string
+  category?: string | null
+  publish_date?: string | null
+  magnet?: string | null
+  preview_images?: string | null
+  detail_url: string
+  size?: number | null
+  website?: string | null
+  edk?: string | null
+}
+
+export interface CrawlerPreviewListItem {
+  tid: number
+  detail_url: string
+}
+
+export interface CrawlerPreviewResult {
+  mode: 'forumdisplay' | 'viewthread'
+  url: string
+  fid?: string | null
+  count?: number
+  items?: CrawlerPreviewListItem[]
+  article?: CrawlerPreviewArticle
+  runtime: CrawlerRuntimeConfig
+}
