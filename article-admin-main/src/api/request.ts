@@ -19,7 +19,7 @@ export function request<T>(
       const message =
         error?.response?.data?.message ||
         (error?.message === 'Network Error'
-          ? '无法连接后端接口，请确认后端已启动，且数据库地址可达'
+          ? '无法连接后端接口，请确认后端已启动且数据库可访问'
           : error?.message) ||
         'request failed'
       toast.error(message)

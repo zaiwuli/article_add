@@ -33,7 +33,7 @@ export function CrawlerCenter() {
             <h1 className='text-2xl font-bold'>爬虫中心</h1>
           </div>
           <p className='max-w-2xl text-sm text-muted-foreground'>
-            这里只保留爬虫配置。设置模块、代理和 FlareSolverR 后，任务页会直接读取这里的配置执行抓取。
+            这里专门维护爬虫配置。设置模块、代理和 FlareSolverR 后，任务页会直接读取这些配置执行抓取。
           </p>
         </div>
 
@@ -41,7 +41,7 @@ export function CrawlerCenter() {
           <CardHeader className='pb-4'>
             <CardTitle>爬虫配置</CardTitle>
             <CardDescription>
-              页面内直接配置，不再混入手动抓取、重置和其他维护操作。
+              页面里只保留配置项，不再混入手动抓取、重置和其他维护操作。
             </CardDescription>
           </CardHeader>
           <CardContent>

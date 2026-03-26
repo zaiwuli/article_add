@@ -5,6 +5,7 @@ import {
   ListTodo,
   ScrollText,
   Settings,
+  Waypoints,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -36,6 +37,11 @@ export const sidebarData: SidebarData = {
           title: '爬虫中心',
           url: '/crawler',
           icon: Bug,
+        },
+        {
+          title: 'API 中心',
+          url: '/api-center',
+          icon: Waypoints,
         },
       ],
     },

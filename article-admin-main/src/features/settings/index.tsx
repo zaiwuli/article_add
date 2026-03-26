@@ -40,7 +40,7 @@ export function Settings() {
             <h1 className='text-3xl font-bold'>系统设置</h1>
           </div>
           <p className='text-muted-foreground'>
-            管理账户和通知配置。爬虫中心已经独立到侧边栏单独入口。
+            这里仅管理账户和通知配置，爬虫中心已经单独移到侧边栏。
           </p>
         </div>
         <TopNav items={sidebarNavItems} />

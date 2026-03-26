@@ -27,6 +27,7 @@ import { Route as AuthenticatedLogsIndexRouteImport } from './routes/_authentica
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedCrawlerIndexRouteImport } from './routes/_authenticated/crawler/index'
 import { Route as AuthenticatedArticlesIndexRouteImport } from './routes/_authenticated/articles/index'
+import { Route as AuthenticatedApiCenterIndexRouteImport } from './routes/_authenticated/api-center/index'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsCrawlerRouteImport } from './routes/_authenticated/settings/crawler'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
@@ -126,6 +127,12 @@ const AuthenticatedArticlesIndexRoute =
     path: '/articles/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedApiCenterIndexRoute =
+  AuthenticatedApiCenterIndexRouteImport.update({
+    id: '/api-center/',
+    path: '/api-center/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/api-center': typeof AuthenticatedApiCenterIndexRoute
   '/articles': typeof AuthenticatedArticlesIndexRoute
   '/crawler': typeof AuthenticatedCrawlerIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/api-center': typeof AuthenticatedApiCenterIndexRoute
   '/articles': typeof AuthenticatedArticlesIndexRoute
   '/crawler': typeof AuthenticatedCrawlerIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -214,6 +223,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/crawler': typeof AuthenticatedSettingsCrawlerRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/api-center/': typeof AuthenticatedApiCenterIndexRoute
   '/_authenticated/articles/': typeof AuthenticatedArticlesIndexRoute
   '/_authenticated/crawler/': typeof AuthenticatedCrawlerIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/crawler'
     | '/settings/notifications'
+    | '/api-center'
     | '/articles'
     | '/crawler'
     | '/help-center'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/crawler'
     | '/settings/notifications'
+    | '/api-center'
     | '/articles'
     | '/crawler'
     | '/help-center'
@@ -285,6 +297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/crawler'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/api-center/'
     | '/_authenticated/articles/'
     | '/_authenticated/crawler/'
     | '/_authenticated/help-center/'
@@ -434,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedArticlesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/api-center/': {
+      id: '/_authenticated/api-center/'
+      path: '/api-center'
+      fullPath: '/api-center'
+      preLoaderRoute: typeof AuthenticatedApiCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings/notifications': {
       id: '/_authenticated/settings/notifications'
       path: '/notifications'
@@ -490,6 +510,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedApiCenterIndexRoute: typeof AuthenticatedApiCenterIndexRoute
   AuthenticatedArticlesIndexRoute: typeof AuthenticatedArticlesIndexRoute
   AuthenticatedCrawlerIndexRoute: typeof AuthenticatedCrawlerIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
@@ -501,6 +522,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedApiCenterIndexRoute: AuthenticatedApiCenterIndexRoute,
   AuthenticatedArticlesIndexRoute: AuthenticatedArticlesIndexRoute,
   AuthenticatedCrawlerIndexRoute: AuthenticatedCrawlerIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,

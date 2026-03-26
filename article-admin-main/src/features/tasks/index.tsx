@@ -23,7 +23,7 @@ export function Tasks() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>任务调度管理</h2>
             <p className='text-muted-foreground'>
-              图形化配置定时任务，按页数和勾选模块安排抓取。
+              用图形化方式配置定时抓取任务，按页数和选中模块执行。
             </p>
           </div>
         </div>

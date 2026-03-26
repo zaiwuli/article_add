@@ -31,7 +31,7 @@ export function Articles() {
               <h1 className='text-2xl font-bold'>资源数据</h1>
             </div>
             <p className='text-sm text-muted-foreground'>
-              查看爬虫已经写入资源表的内容。
+              查看已经写入资源表的抓取结果。
             </p>
           </div>
         </div>

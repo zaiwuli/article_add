@@ -94,14 +94,13 @@ export function CrawlerForm() {
   })
 
   const saveSectionsMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof crawlerSettingsSchema>) => {
-      return postConfig(
+    mutationFn: async (values: z.infer<typeof crawlerSettingsSchema>) =>
+      postConfig(
         'CrawlerSections',
         values.sections
           .map((item) => normalizeSection(item))
           .filter((item) => item.fid)
-      )
-    },
+      ),
     onSuccess: (res, values) => {
       if (res.code === 0) {
         const nextSections = values.sections
@@ -116,9 +115,8 @@ export function CrawlerForm() {
   })
 
   const saveRuntimeMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof crawlerRuntimeSchema>) => {
-      return postConfig('CrawlerRuntime', values)
-    },
+    mutationFn: async (values: z.infer<typeof crawlerRuntimeSchema>) =>
+      postConfig('CrawlerRuntime', values),
     onSuccess: (res, values) => {
       if (res.code === 0) {
         runtimeForm.reset(values)
@@ -158,7 +156,8 @@ export function CrawlerForm() {
             <div className='space-y-1'>
               <CardTitle>模块配置</CardTitle>
               <CardDescription>
-                任务页会读取这里的模块列表。新增模块时只填 `fid` 也可以保存。
+                任务页会直接读取这里的模块列表。新增模块时，只填 `fid`
+                也可以保存。
               </CardDescription>
             </div>
             <Button
@@ -186,7 +185,9 @@ export function CrawlerForm() {
               className='space-y-4'
             >
               {isSectionLoading && (
-                <p className='text-sm text-muted-foreground'>正在加载模块配置...</p>
+                <p className='text-sm text-muted-foreground'>
+                  正在加载模块配置...
+                </p>
               )}
 
               {fields.length === 0 && !isSectionLoading && (
@@ -232,7 +233,7 @@ export function CrawlerForm() {
                           <FormLabel>模块名称</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder='例如：VR 视频区'
+                              placeholder='例如：MR 视频区'
                               {...field}
                               value={field.value ?? ''}
                             />
@@ -261,7 +262,9 @@ export function CrawlerForm() {
 
               <Button type='submit' disabled={saveSectionsMutation.isPending}>
                 <Save />
-                {saveSectionsMutation.isPending ? '保存中...' : '保存模块配置'}
+                {saveSectionsMutation.isPending
+                  ? '保存中...'
+                  : '保存模块配置'}
               </Button>
             </form>
           </Form>
@@ -287,7 +290,9 @@ export function CrawlerForm() {
               className='space-y-4'
             >
               {isRuntimeLoading && (
-                <p className='text-sm text-muted-foreground'>正在加载网络配置...</p>
+                <p className='text-sm text-muted-foreground'>
+                  正在加载网络配置...
+                </p>
               )}
 
               <FormField
@@ -320,7 +325,9 @@ export function CrawlerForm() {
 
               <Button type='submit' disabled={saveRuntimeMutation.isPending}>
                 <Save />
-                {saveRuntimeMutation.isPending ? '保存中...' : '保存网络配置'}
+                {saveRuntimeMutation.isPending
+                  ? '保存中...'
+                  : '保存网络配置'}
               </Button>
             </form>
           </Form>

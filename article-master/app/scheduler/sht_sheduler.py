@@ -4,7 +4,8 @@ import time
 from datetime import datetime
 from typing import Dict, Iterable, Optional, Tuple
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.config import data_path
 from app.core.database import session_scope
@@ -12,6 +13,20 @@ from app.models.article import Article
 from app.modules.sht import sht
 from app.scheduler.sht_section_registry import get_section_config, get_section_configs
 from app.utils.log import logger
+
+ARTICLE_INSERT_FIELDS = (
+    "tid",
+    "title",
+    "publish_date",
+    "magnet",
+    "preview_images",
+    "detail_url",
+    "size",
+    "section",
+    "category",
+    "website",
+    "edk",
+)
 
 
 def sync_sht_by_tid(
@@ -66,7 +81,8 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
     fail_id_list = []
     page = int(start_page)
     max_page = int(max_page)
-    success_count = 0
+    articles = []
+    seen_tids = set()
 
     with session_scope() as session:
         stop_tid = (
@@ -77,7 +93,6 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
         )
 
     logger.info(f"[{section}] latest saved tid: {stop_tid}")
-    articles = []
     while page <= max_page:
         time.sleep(1)
         logger.info(f"[{section}] fetch page {page}")
@@ -88,9 +103,8 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
 
         min_tid = min(tid_list)
         logger.info(f"[{section}] min tid on page {page}: {min_tid}")
-        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list)
+        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list, seen_tids)
         articles.extend(articles_added)
-        success_count += len(articles_added)
         fail_id_list.extend(page_fail_ids)
 
         if min_tid <= stop_tid:
@@ -98,10 +112,10 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
             break
         page += 1
 
-    _save_articles(articles)
+    inserted_count = _save_articles(articles)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
-    return success_count, page, len(retry_fail_id_list)
+    return inserted_count, page, len(retry_fail_id_list)
 
 
 def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
@@ -110,8 +124,8 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
     page = int(start_page)
     max_page = int(max_page)
     fail_id_list = []
-    success_count = 0
     articles = []
+    seen_tids = set()
 
     while page <= max_page:
         time.sleep(1)
@@ -121,16 +135,15 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
             logger.info(f"[{section}] stop after retries on page {page}")
             break
 
-        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list)
+        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list, seen_tids)
         articles.extend(articles_added)
-        success_count += len(articles_added)
         fail_id_list.extend(page_fail_ids)
         page += 1
 
-    _save_articles(articles)
+    inserted_count = _save_articles(articles)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
-    return success_count, page, len(retry_fail_id_list)
+    return inserted_count, page, len(retry_fail_id_list)
 
 
 def _fetch_tid_list(fid, page):
@@ -145,26 +158,28 @@ def _fetch_tid_list(fid, page):
     return []
 
 
-def _crawl_articles(section_config: Dict[str, str], tid_list):
+def _crawl_articles(section_config: Dict[str, str], tid_list, seen_tids=None):
     website = section_config["website"]
     section = section_config["section"]
     articles = []
     fail_id_list = []
+    seen_tids = seen_tids if seen_tids is not None else set()
 
+    unique_tid_list = list(dict.fromkeys(tid_list))
     with session_scope() as session:
         existing_article_tids = set(
             session.execute(
                 select(Article.tid).filter(
                     Article.website == website,
-                    Article.tid.in_(tid_list),
+                    Article.tid.in_(unique_tid_list),
                 )
             )
             .scalars()
             .all()
         )
 
-    for tid in tid_list:
-        if tid in existing_article_tids:
+    for tid in unique_tid_list:
+        if tid in existing_article_tids or tid in seen_tids:
             continue
 
         detail_url = (
@@ -187,6 +202,7 @@ def _crawl_articles(section_config: Dict[str, str], tid_list):
                 }
             )
             articles.append(Article(data))
+            seen_tids.add(tid)
             time.sleep(1)
         except Exception as exc:
             logger.error(f"[{section}] crawl tid={tid} failed: {exc}")
@@ -195,11 +211,71 @@ def _crawl_articles(section_config: Dict[str, str], tid_list):
     return articles, fail_id_list
 
 
+def _article_to_payload(article: Article):
+    return {
+        field: getattr(article, field)
+        for field in ARTICLE_INSERT_FIELDS
+    }
+
+
+def _prepare_insert_payloads(articles):
+    unique_payloads = {}
+    for article in articles:
+        if not article.website or article.tid is None:
+            continue
+        unique_payloads[(article.website, article.tid)] = _article_to_payload(article)
+    return list(unique_payloads.values())
+
+
+def _filter_existing_payloads(session, payloads):
+    if not payloads:
+        return []
+
+    existing_pairs = set(
+        session.execute(
+            select(Article.website, Article.tid).where(
+                tuple_(Article.website, Article.tid).in_(
+                    [(payload["website"], payload["tid"]) for payload in payloads]
+                )
+            )
+        ).all()
+    )
+
+    return [
+        payload
+        for payload in payloads
+        if (payload["website"], payload["tid"]) not in existing_pairs
+    ]
+
+
 def _save_articles(articles):
-    if not articles:
-        return
+    payloads = _prepare_insert_payloads(articles)
+    if not payloads:
+        return 0
+
     with session_scope() as session:
-        session.add_all(articles)
+        pending_payloads = _filter_existing_payloads(session, payloads)
+        if not pending_payloads:
+            logger.info("skip insert because all crawled articles already exist")
+            return 0
+
+        if session.bind is not None and session.bind.dialect.name == "postgresql":
+            stmt = pg_insert(Article.__table__).values(pending_payloads)
+            stmt = stmt.on_conflict_do_nothing(
+                index_elements=["website", "tid"]
+            )
+            result = session.execute(stmt)
+            inserted_count = result.rowcount if result.rowcount and result.rowcount > 0 else 0
+            logger.info(
+                f"saved {inserted_count} articles, skipped {len(payloads) - inserted_count} duplicates"
+            )
+            return inserted_count
+
+        session.add_all([Article(payload) for payload in pending_payloads])
+        logger.info(
+            f"saved {len(pending_payloads)} articles, skipped {len(payloads) - len(pending_payloads)} duplicates"
+        )
+        return len(pending_payloads)
 
 
 def save_fail_tid_to_file(fid, fail_id_list):

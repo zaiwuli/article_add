@@ -62,7 +62,7 @@ const taskSchema = z.object({
   selected_fids: z.array(z.string()).min(1, '至少选择一个模块'),
   start_page: z.number().int().min(1, '起始页必须大于 0'),
   max_page: z.number().int().min(1, '页数必须大于 0'),
-  task_cron: z.string().min(5, '请输入有效的 cron 表达式'),
+  task_cron: z.string().min(5, '请输入有效的 Cron 表达式'),
   enable: z.boolean(),
 })
 
@@ -203,7 +203,12 @@ export default function TaskManager() {
 
   const sectionLabelMap = useMemo(
     () =>
-      new Map((crawlerSections ?? []).map((item) => [item.fid, item.section])),
+      new Map(
+        (crawlerSections ?? []).map((item) => [
+          String(item.fid),
+          item.section || `模块 ${item.fid}`,
+        ])
+      ),
     [crawlerSections]
   )
 
@@ -274,10 +279,10 @@ export default function TaskManager() {
         <div className='space-y-1'>
           <p className='flex items-center gap-1 text-xs text-muted-foreground md:text-sm'>
             <Zap className='h-3 w-3 fill-amber-500 text-amber-500' />
-            当前任务数 {tasks?.length ?? 0}
+            当前任务数：{tasks?.length ?? 0}
           </p>
           <p className='text-sm text-muted-foreground'>
-            任务参数已经改成图形化配置，只有勾选的模块才会参与抓取。
+            任务参数已经改成图形化配置，只有选中的模块才会参与抓取。
           </p>
         </div>
 
@@ -309,7 +314,7 @@ export default function TaskManager() {
                   <FormItem>
                     <FormLabel>任务名称</FormLabel>
                     <FormControl>
-                      <Input placeholder='例如：VR 模块批量抓取' {...field} />
+                      <Input placeholder='例如：MR 模块批量抓取' {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -339,10 +344,11 @@ export default function TaskManager() {
                         </SelectContent>
                       </Select>
                     </FormControl>
-                    <FormDescription>
-                      {currentFunction?.func_args_description ||
-                        '先选择抓取模式，再设置页数和抓取模块。'}
-                    </FormDescription>
+                    {currentFunction?.func_args_description && (
+                      <FormDescription>
+                        {currentFunction.func_args_description}
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -404,7 +410,7 @@ export default function TaskManager() {
                         <div>
                           <FormLabel>抓取模块</FormLabel>
                           <FormDescription>
-                            只会抓取勾选的模块，不勾选就不会执行。
+                            只有选中的模块会执行抓取，不选中就不会运行。
                           </FormDescription>
                         </div>
                         <div className='flex flex-wrap gap-2'>
@@ -414,7 +420,9 @@ export default function TaskManager() {
                             size='sm'
                             onClick={() =>
                               field.onChange(
-                                (crawlerSections ?? []).map((item) => item.fid)
+                                (crawlerSections ?? []).map((item) =>
+                                  String(item.fid)
+                                )
                               )
                             }
                           >
@@ -439,11 +447,12 @@ export default function TaskManager() {
                         )}
 
                         {(crawlerSections ?? []).map((section) => {
-                          const checked = selectedFids.includes(section.fid)
+                          const fid = String(section.fid)
+                          const checked = selectedFids.includes(fid)
 
                           return (
                             <label
-                              key={section.fid}
+                              key={fid}
                               className={cn(
                                 'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
                                 checked
@@ -455,22 +464,21 @@ export default function TaskManager() {
                                 checked={checked}
                                 onCheckedChange={(nextChecked) => {
                                   if (nextChecked) {
-                                    field.onChange([
-                                      ...selectedFids,
-                                      section.fid,
-                                    ])
+                                    field.onChange(
+                                      Array.from(
+                                        new Set([...selectedFids, fid])
+                                      )
+                                    )
                                     return
                                   }
 
                                   field.onChange(
-                                    selectedFids.filter(
-                                      (item) => item !== section.fid
-                                    )
+                                    selectedFids.filter((item) => item !== fid)
                                   )
                                 }}
                               />
                               <span className='text-sm font-medium'>
-                                {section.section}
+                                {section.section || `模块 ${fid}`}
                               </span>
                             </label>
                           )
@@ -551,7 +559,7 @@ export default function TaskManager() {
             {(tasks ?? []).map((task) => {
               const parsedArgs = parseTaskArgs(task.task_args)
               const selectedSections = parsedArgs.fids
-                .map((fid) => sectionLabelMap.get(fid) || `fid:${fid}`)
+                .map((fid) => sectionLabelMap.get(fid) || `模块 ${fid}`)
                 .join('、')
 
               return (
@@ -590,7 +598,7 @@ export default function TaskManager() {
                     </span>
                     <div className='space-y-1 text-right md:text-left'>
                       <p className='text-sm'>
-                        页数: {getPageRangeLabel(parsedArgs.start_page, parsedArgs.max_page)}
+                        页数：{getPageRangeLabel(parsedArgs.start_page, parsedArgs.max_page)}
                       </p>
                       <p className='max-w-[320px] text-xs text-muted-foreground'>
                         {selectedSections || '未配置模块'}

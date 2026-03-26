@@ -56,12 +56,14 @@ def read_log_content(scope: str = "app", name: str | None = None, lines: int = 2
         return error("unsupported log scope")
 
     directory = LOG_SCOPE_DIRS[scope]
+    max_lines = max(1, min(lines, 1000))
+
     if not directory.exists():
         return success(
             {
                 "scope": scope,
                 "name": name,
-                "lines": max(1, min(lines, 1000)),
+                "lines": max_lines,
                 "content": "",
                 "updated_time": None,
                 "size": 0,
@@ -78,7 +80,7 @@ def read_log_content(scope: str = "app", name: str | None = None, lines: int = 2
             {
                 "scope": scope,
                 "name": name,
-                "lines": max(1, min(lines, 1000)),
+                "lines": max_lines,
                 "content": "",
                 "updated_time": None,
                 "size": 0,
@@ -92,7 +94,6 @@ def read_log_content(scope: str = "app", name: str | None = None, lines: int = 2
     if resolved_directory not in resolved_file.parents or not resolved_file.exists():
         return error("log file not found")
 
-    max_lines = max(1, min(lines, 1000))
     tail = deque(maxlen=max_lines)
     with resolved_file.open("r", encoding="utf-8", errors="ignore") as file:
         for line in file:
