@@ -70,7 +70,7 @@ export function TransferCenter() {
       saveTransferConfig(payload),
     onSuccess: (res) => {
       if (res.code === 0) {
-        toast.success('Transfer config saved')
+        toast.success('转存配置已保存')
       }
     },
   })
@@ -80,8 +80,8 @@ export function TransferCenter() {
       testTransferConnection(payload),
     onSuccess: (res) => {
       if (res.code === 0) {
-        setLastResult('Target database connection succeeded')
-        toast.success('Connection succeeded')
+        setLastResult('目标数据库连接成功')
+        toast.success('连接测试成功')
       }
     },
   })
@@ -96,7 +96,7 @@ export function TransferCenter() {
         if (nextTables.length > 0 && !nextTables.includes(form.table)) {
           setForm((current) => ({ ...current, table: nextTables[0] }))
         }
-        toast.success('Target tables loaded')
+        toast.success('目标数据表已加载')
       }
     },
   })
@@ -106,16 +106,16 @@ export function TransferCenter() {
     onSuccess: (res) => {
       if (res.code === 0 && res.data) {
         setLastResult(
-          `Transfer completed: total ${res.data.total}, inserted ${res.data.inserted}, skipped ${res.data.skipped}`
+          `转存完成：总计 ${res.data.total} 条，新增 ${res.data.inserted} 条，跳过 ${res.data.skipped} 条`
         )
-        toast.success('Transfer completed')
+        toast.success('转存完成')
       }
     },
   })
 
   const targetLabel = useMemo(() => {
     if (!form.host || !form.database) {
-      return 'Not configured'
+      return '未配置'
     }
     return `${form.host}:${form.port}/${form.database}`
   }, [form.database, form.host, form.port])
@@ -143,15 +143,15 @@ export function TransferCenter() {
           <div className='space-y-2'>
             <div className='flex items-center gap-3'>
               <ArrowRightLeft className='h-7 w-7 text-primary' />
-              <h1 className='text-2xl font-bold'>Transfer Center</h1>
+              <h1 className='text-2xl font-bold'>转存中心</h1>
             </div>
             <p className='max-w-3xl text-sm text-muted-foreground'>
-              Crawled data is written to the local main table first. This page
-              copies data from `sht.article` into a table in another database.
+              爬虫会先把数据写入本地主资源表，这里再把 `sht.article`
+              里的数据追加转存到其他数据库的目标表。
             </p>
           </div>
 
-          <Badge variant='outline'>Target DB: {targetLabel}</Badge>
+          <Badge variant='outline'>目标库：{targetLabel}</Badge>
         </div>
 
         <div className='grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]'>
@@ -159,24 +159,23 @@ export function TransferCenter() {
             <CardHeader>
               <CardTitle className='flex items-center gap-2 text-base'>
                 <Database className='h-4 w-4' />
-                Target Database
+                目标数据库
               </CardTitle>
               <CardDescription>
-                Configure the external PostgreSQL database, then choose the
-                target table.
+                先配置外部 PostgreSQL 数据库，再选择要写入的目标表。
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-4'>
               <div className='grid gap-4 md:grid-cols-2'>
                 <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Host</label>
+                  <label className='text-sm font-medium'>主机地址</label>
                   <Input
                     value={form.host}
                     onChange={(event) => updateField('host', event.target.value)}
                   />
                 </div>
                 <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Port</label>
+                  <label className='text-sm font-medium'>端口</label>
                   <Input
                     type='number'
                     value={form.port}
@@ -188,7 +187,7 @@ export function TransferCenter() {
               </div>
 
               <div className='space-y-2'>
-                <label className='text-sm font-medium'>Database</label>
+                <label className='text-sm font-medium'>数据库名</label>
                 <Input
                   value={form.database}
                   onChange={(event) =>
@@ -199,7 +198,7 @@ export function TransferCenter() {
 
               <div className='grid gap-4 md:grid-cols-2'>
                 <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Username</label>
+                  <label className='text-sm font-medium'>用户名</label>
                   <Input
                     value={form.username}
                     onChange={(event) =>
@@ -208,7 +207,7 @@ export function TransferCenter() {
                   />
                 </div>
                 <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Password</label>
+                  <label className='text-sm font-medium'>密码</label>
                   <Input
                     type='password'
                     value={form.password}
@@ -228,13 +227,13 @@ export function TransferCenter() {
                   />
                 </div>
                 <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Target Table</label>
+                  <label className='text-sm font-medium'>目标表</label>
                   <Select
                     value={form.table || undefined}
                     onValueChange={(value) => updateField('table', value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder='Select table' />
+                      <SelectValue placeholder='请选择目标表' />
                     </SelectTrigger>
                     <SelectContent>
                       {tables.map((table) => (
@@ -255,7 +254,7 @@ export function TransferCenter() {
                   disabled={testMutation.isPending}
                 >
                   <PlugZap />
-                  {testMutation.isPending ? 'Testing...' : 'Test Connection'}
+                  {testMutation.isPending ? '测试中...' : '测试连接'}
                 </Button>
                 <Button
                   type='button'
@@ -263,7 +262,7 @@ export function TransferCenter() {
                   onClick={() => tablesMutation.mutate(form)}
                   disabled={tablesMutation.isPending}
                 >
-                  {tablesMutation.isPending ? 'Loading...' : 'Load Tables'}
+                  {tablesMutation.isPending ? '加载中...' : '读取数据表'}
                 </Button>
                 <Button
                   type='button'
@@ -271,7 +270,7 @@ export function TransferCenter() {
                   disabled={saveMutation.isPending}
                 >
                   <Save />
-                  {saveMutation.isPending ? 'Saving...' : 'Save Config'}
+                  {saveMutation.isPending ? '保存中...' : '保存配置'}
                 </Button>
               </div>
             </CardContent>
@@ -279,26 +278,26 @@ export function TransferCenter() {
 
           <Card>
             <CardHeader>
-              <CardTitle className='text-base'>Run Transfer</CardTitle>
+              <CardTitle className='text-base'>执行转存</CardTitle>
               <CardDescription>
-                Transfer reads from the local main table and appends data to the
-                target table, skipping duplicate `(website, tid)` pairs.
+                转存会读取本地主资源表，再写入目标表；已存在的
+                `(website, tid)` 数据会自动跳过。
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-4'>
               <div className='rounded-xl border p-4'>
-                <div className='text-sm text-muted-foreground'>Current Target</div>
+                <div className='text-sm text-muted-foreground'>当前目标</div>
                 <div className='mt-2 break-all font-mono text-sm'>
-                  {form.schema || 'public'}.{form.table || '<no table selected>'}
+                  {form.schema || 'public'}.{form.table || '未选择目标表'}
                 </div>
               </div>
 
               <div className='rounded-xl border p-4'>
-                <div className='text-sm text-muted-foreground'>Flow</div>
+                <div className='text-sm text-muted-foreground'>执行流程</div>
                 <div className='mt-2 space-y-1 text-sm'>
-                  <p>1. Crawler writes to `sht.article` first.</p>
-                  <p>2. Transfer copies data into the external target table.</p>
-                  <p>3. Existing `(website, tid)` rows are skipped.</p>
+                  <p>1. 爬虫先把数据写入 `sht.article`。</p>
+                  <p>2. 转存功能再把数据追加到外部目标表。</p>
+                  <p>3. 已存在的 `(website, tid)` 记录自动跳过。</p>
                 </div>
               </div>
 
@@ -309,7 +308,7 @@ export function TransferCenter() {
                   disabled={runMutation.isPending}
                 >
                   <ArrowRightLeft />
-                  {runMutation.isPending ? 'Running...' : 'Start Transfer'}
+                  {runMutation.isPending ? '转存中...' : '开始转存'}
                 </Button>
               </div>
 

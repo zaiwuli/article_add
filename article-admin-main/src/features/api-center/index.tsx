@@ -63,7 +63,7 @@ export function ApiCenter() {
         queryClient.setQueryData(['public-article-api-config'], {
           enabled: nextEnabled,
         })
-        toast.success(nextEnabled ? 'Resource API enabled' : 'Resource API disabled')
+        toast.success(nextEnabled ? '资源接口已开启' : '资源接口已关闭')
       }
     },
   })
@@ -71,9 +71,9 @@ export function ApiCenter() {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(resourceApiUrl)
-      toast.success('API URL copied')
+      toast.success('接口地址已复制')
     } catch {
-      toast.error('Copy failed')
+      toast.error('复制失败')
     }
   }
 
@@ -98,40 +98,37 @@ export function ApiCenter() {
           <div className='space-y-2'>
             <div className='flex items-center gap-3'>
               <Database className='h-7 w-7 text-primary' />
-              <h1 className='text-2xl font-bold'>Resource API</h1>
+              <h1 className='text-2xl font-bold'>资源接口</h1>
             </div>
             <p className='max-w-3xl text-sm text-muted-foreground'>
-              This page only exposes the main article table API. Crawled data is
-              written to `sht.article` first, and other tools can read from this
-              public endpoint.
+              这里仅提供资源主表的公开读取接口。爬虫会先把数据写入
+              `sht.article`，其他工具再通过这个接口读取。
             </p>
           </div>
 
-          <Badge variant='outline'>
-            Status: {enabled ? 'Enabled' : 'Disabled'}
-          </Badge>
+          <Badge variant='outline'>状态：{enabled ? '已开启' : '已关闭'}</Badge>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center gap-2 text-base'>
               <Link2 className='h-4 w-4' />
-              API Endpoint
+              接口地址
             </CardTitle>
             <CardDescription>
-              Main endpoint: `GET /api/v1/public/articles`
+              主接口：`GET /api/v1/public/articles`
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-4'>
             <div className='rounded-xl border p-4'>
-              <div className='text-sm text-muted-foreground'>URL</div>
+              <div className='text-sm text-muted-foreground'>地址</div>
               <div className='mt-2 break-all font-mono text-sm'>
                 {resourceApiUrl}
               </div>
             </div>
 
             <div className='rounded-xl border p-4'>
-              <div className='text-sm text-muted-foreground'>Query Params</div>
+              <div className='text-sm text-muted-foreground'>可用参数</div>
               <div className='mt-2 flex flex-wrap gap-2'>
                 {['page', 'per_page', 'keyword', 'section', 'category', 'website'].map(
                   (item) => (
@@ -147,10 +144,10 @@ export function ApiCenter() {
               <div className='space-y-1'>
                 <div className='flex items-center gap-2 text-sm font-medium'>
                   <Power className='h-4 w-4' />
-                  Public API Switch
+                  接口开关
                 </div>
                 <p className='text-sm text-muted-foreground'>
-                  When disabled, public article APIs stop returning data.
+                  关闭后，公开资源接口将不再返回数据。
                 </p>
               </div>
               <Switch
@@ -163,7 +160,7 @@ export function ApiCenter() {
             <div className='flex justify-end gap-2'>
               <Button type='button' variant='outline' onClick={handleCopy}>
                 <Copy />
-                Copy URL
+                复制地址
               </Button>
             </div>
           </CardContent>
