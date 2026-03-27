@@ -6,6 +6,8 @@ export interface TransferTargetConfig {
   password: string
   schema: string
   table: string
+  schedule_enabled: boolean
+  schedule_cron: string
 }
 
 export interface TransferTablesResult {

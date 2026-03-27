@@ -30,6 +30,8 @@ def get_default_transfer_target_config():
         "password": "",
         "schema": "public",
         "table": "",
+        "schedule_enabled": False,
+        "schedule_cron": "0 2 * * *",
     }
 
 

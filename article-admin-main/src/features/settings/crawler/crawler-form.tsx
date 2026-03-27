@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -6,15 +6,11 @@ import { Network, Plus, Save, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { getConfig, postConfig } from '@/api/config'
-import type {
-  CrawlerRuntimeConfig,
-  CrawlerSection,
-} from '@/types/config'
+import type { CrawlerRuntimeConfig, CrawlerSection } from '@/types/config'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -27,6 +23,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const crawlerSectionSchema = z.object({
   fid: z.string().min(1, '请输入模块 ID'),
@@ -52,6 +49,7 @@ function normalizeSection(section: Partial<CrawlerSection>) {
 }
 
 export function CrawlerForm() {
+  const [activeTab, setActiveTab] = useState<'sections' | 'runtime'>('sections')
   const queryClient = useQueryClient()
 
   const sectionsForm = useForm<z.infer<typeof crawlerSettingsSchema>>({
@@ -148,18 +146,19 @@ export function CrawlerForm() {
   })
 
   return (
-    <div className='space-y-6'>
-      <div className='grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]'>
-        <Card className='border-dashed'>
-          <CardHeader className='pb-4'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <div className='space-y-1'>
-                <CardTitle>模块配置</CardTitle>
-                <CardDescription>
-                  这里维护可抓取的模块列表。任务页会直接读取这些模块，你只填
-                  `fid` 也可以保存。
-                </CardDescription>
-              </div>
+    <div className='space-y-4'>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'sections' | 'runtime')}>
+        <TabsList className='w-full justify-start gap-2'>
+          <TabsTrigger value='sections'>模块配置</TabsTrigger>
+          <TabsTrigger value='runtime'>网络配置</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeTab === 'sections' && (
+        <Card>
+          <CardHeader className='border-b'>
+            <div className='flex items-center justify-between gap-3'>
+              <CardTitle className='text-base'>模块配置</CardTitle>
               <Button
                 type='button'
                 variant='outline'
@@ -176,7 +175,7 @@ export function CrawlerForm() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className='p-5'>
             <Form {...sectionsForm}>
               <form
                 onSubmit={sectionsForm.handleSubmit((values) =>
@@ -185,9 +184,7 @@ export function CrawlerForm() {
                 className='space-y-4'
               >
                 {isSectionLoading && (
-                  <p className='text-sm text-muted-foreground'>
-                    正在加载模块配置...
-                  </p>
+                  <p className='text-sm text-muted-foreground'>正在加载模块配置...</p>
                 )}
 
                 {fields.length === 0 && !isSectionLoading && (
@@ -262,26 +259,23 @@ export function CrawlerForm() {
 
                 <Button type='submit' disabled={saveSectionsMutation.isPending}>
                   <Save />
-                  {saveSectionsMutation.isPending
-                    ? '保存中...'
-                    : '保存模块配置'}
+                  {saveSectionsMutation.isPending ? '保存中...' : '保存模块配置'}
                 </Button>
               </form>
             </Form>
           </CardContent>
         </Card>
+      )}
 
-        <Card className='border-dashed'>
-          <CardHeader className='pb-4'>
-            <CardTitle className='flex items-center gap-2'>
+      {activeTab === 'runtime' && (
+        <Card>
+          <CardHeader className='border-b'>
+            <CardTitle className='flex items-center gap-2 text-base'>
               <Network className='h-4 w-4' />
               网络配置
             </CardTitle>
-            <CardDescription>
-              爬虫运行时会实时读取这里的代理和 FlareSolverR 地址。
-            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className='p-5'>
             <Form {...runtimeForm}>
               <form
                 onSubmit={runtimeForm.handleSubmit((values) =>
@@ -290,9 +284,7 @@ export function CrawlerForm() {
                 className='space-y-4'
               >
                 {isRuntimeLoading && (
-                  <p className='text-sm text-muted-foreground'>
-                    正在加载网络配置...
-                  </p>
+                  <p className='text-sm text-muted-foreground'>正在加载网络配置...</p>
                 )}
 
                 <FormField
@@ -325,15 +317,13 @@ export function CrawlerForm() {
 
                 <Button type='submit' disabled={saveRuntimeMutation.isPending}>
                   <Save />
-                  {saveRuntimeMutation.isPending
-                    ? '保存中...'
-                    : '保存网络配置'}
+                  {saveRuntimeMutation.isPending ? '保存中...' : '保存网络配置'}
                 </Button>
               </form>
             </Form>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   )
 }

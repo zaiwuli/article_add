@@ -9,6 +9,8 @@ class TransferTargetPayload(BaseModel):
     password: str = ""
     schema: str = "public"
     table: str = ""
+    schedule_enabled: bool = False
+    schedule_cron: str = "0 2 * * *"
 
 
 class TransferTableLookupPayload(BaseModel):

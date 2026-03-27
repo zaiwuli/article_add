@@ -5,6 +5,7 @@ from sqlalchemy.engine import URL
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.sqltypes import ARRAY
+from apscheduler.triggers.cron import CronTrigger
 
 from app.api.services.article_service import normalize_string_list
 from app.api.services.config_service import (
@@ -17,6 +18,7 @@ from app.models.article import Article
 from app.schemas.config import JsonPayload
 from app.schemas.response import error, success
 from app.schemas.transfer import TransferTargetPayload
+from app.utils.log import transfer_logger
 
 TRANSFER_FIELDS = (
     "tid",
@@ -58,6 +60,8 @@ def _normalize_target_payload(payload: TransferTargetPayload | dict | None):
     data["schema"] = str(data.get("schema", "public") or "public").strip()
     data["table"] = str(data.get("table", "")).strip()
     data["port"] = int(data.get("port") or 5432)
+    data["schedule_enabled"] = bool(data.get("schedule_enabled", False))
+    data["schedule_cron"] = str(data.get("schedule_cron", "")).strip()
     return data
 
 
@@ -68,6 +72,18 @@ def _validate_connection_payload(data: dict, require_table: bool = False):
             return error(f"{field} is required")
     if require_table and not data.get("table"):
         return error("table is required")
+    return None
+
+
+def _validate_schedule_payload(data: dict):
+    cron_expr = str(data.get("schedule_cron", "")).strip()
+    if not cron_expr:
+        return error("schedule_cron is required")
+
+    try:
+        CronTrigger.from_crontab(expr=cron_expr)
+    except ValueError as exc:
+        return error(f"invalid schedule_cron: {exc}")
     return None
 
 
@@ -131,6 +147,15 @@ def _adapt_value_for_column(value, column):
     return value
 
 
+def _format_target_label(data: dict):
+    schema = data.get("schema") or "public"
+    table = data.get("table") or "-"
+    return (
+        f"{data.get('host')}:{data.get('port')}/{data.get('database')} "
+        f"{schema}.{table}"
+    )
+
+
 def get_transfer_target_config(db: Session):
     return success(_load_saved_target_config(db))
 
@@ -140,14 +165,29 @@ def save_transfer_target_config(db: Session, payload: TransferTargetPayload):
     validation_error = _validate_connection_payload(data, require_table=False)
     if validation_error:
         return validation_error
+    schedule_validation_error = _validate_schedule_payload(data)
+    if schedule_validation_error:
+        return schedule_validation_error
 
-    return save_option(
+    result = save_option(
         JsonPayload(
             key=ARTICLE_TRANSFER_TARGET_CONFIG_KEY,
             payload=data,
         ),
         db,
     )
+    db.commit()
+
+    from app.scheduler import restart_scheduler
+
+    restart_scheduler()
+    transfer_logger.info(
+        "transfer config updated: "
+        f"target={_format_target_label(data)} "
+        f"schedule_enabled={data['schedule_enabled']} "
+        f"schedule_cron={data['schedule_cron']}"
+    )
+    return result
 
 
 def test_transfer_target_connection(payload: TransferTargetPayload):
@@ -160,6 +200,9 @@ def test_transfer_target_connection(payload: TransferTargetPayload):
     try:
         with engine.connect() as connection:
             connection.execute(select(1))
+        transfer_logger.info(
+            f"connection test succeeded: target={_format_target_label(data)}"
+        )
         return success(
             {
                 "connected": True,
@@ -168,6 +211,9 @@ def test_transfer_target_connection(payload: TransferTargetPayload):
             }
         )
     except SQLAlchemyError as exc:
+        transfer_logger.warning(
+            f"connection test failed: target={_format_target_label(data)} error={exc}"
+        )
         return error(str(exc))
     finally:
         engine.dispose()
@@ -183,6 +229,10 @@ def list_transfer_tables(payload: TransferTargetPayload):
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names(schema=data["schema"])
+        transfer_logger.info(
+            "loaded transfer tables: "
+            f"target={_format_target_label(data)} count={len(tables)}"
+        )
         return success(
             {
                 "schema": data["schema"],
@@ -190,19 +240,33 @@ def list_transfer_tables(payload: TransferTargetPayload):
             }
         )
     except SQLAlchemyError as exc:
+        transfer_logger.warning(
+            f"load transfer tables failed: target={_format_target_label(data)} error={exc}"
+        )
         return error(str(exc))
     finally:
         engine.dispose()
 
 
-def transfer_articles(db: Session):
+def transfer_articles(db: Session, trigger: str = "manual"):
     data = _load_saved_target_config(db)
     validation_error = _validate_connection_payload(data, require_table=True)
     if validation_error:
+        transfer_logger.warning(
+            f"[{trigger}] transfer aborted: target={_format_target_label(data)} "
+            f"reason={validation_error.get('message')}"
+        )
         return validation_error
 
     source_articles = db.query(Article).order_by(Article.id.asc()).all()
+    transfer_logger.info(
+        f"[{trigger}] transfer started: target={_format_target_label(data)} "
+        f"source_total={len(source_articles)}"
+    )
     if not source_articles:
+        transfer_logger.info(
+            f"[{trigger}] transfer skipped because there are no source articles"
+        )
         return success(
             {
                 "table": data["table"],
@@ -223,6 +287,10 @@ def transfer_articles(db: Session):
             target_table = _get_target_table(connection, data["schema"], data["table"])
             missing_columns = _get_missing_columns(target_table)
             if missing_columns:
+                transfer_logger.warning(
+                    f"[{trigger}] transfer aborted: target={_format_target_label(data)} "
+                    f"missing_columns={','.join(missing_columns)}"
+                )
                 return error(
                     f"target table is missing required columns: {', '.join(missing_columns)}"
                 )
@@ -261,6 +329,10 @@ def transfer_articles(db: Session):
                 connection.execute(target_table.insert(), rows)
                 inserted += len(rows)
 
+        transfer_logger.info(
+            f"[{trigger}] transfer completed: target={_format_target_label(data)} "
+            f"total={len(source_articles)} inserted={inserted} skipped={skipped}"
+        )
         return success(
             {
                 "schema": data["schema"],
@@ -272,6 +344,9 @@ def transfer_articles(db: Session):
             message="transfer completed",
         )
     except SQLAlchemyError as exc:
+        transfer_logger.exception(
+            f"[{trigger}] transfer failed: target={_format_target_label(data)} error={exc}"
+        )
         return error(str(exc))
     finally:
         engine.dispose()

@@ -2,6 +2,7 @@ export interface LogFileInfo {
   name: string
   size: number
   updated_time: string
+  compressed: boolean
 }
 
 export interface LogScopeItem {

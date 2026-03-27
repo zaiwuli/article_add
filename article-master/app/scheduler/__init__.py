@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.database import session_scope
 from app.models.task import Task
 from app.scheduler.sht_sheduler import sync_sht_by_max_page, sync_sht_by_tid
-from app.utils.log import logger
+from app.utils.log import logger, transfer_logger
 
 scheduler = AsyncIOScheduler()
 
@@ -32,6 +32,8 @@ FUNC_MAP = {
     "sync_sht_by_max_page": sync_sht_by_max_page,
 }
 
+TRANSFER_JOB_ID = "article_transfer_schedule"
+
 
 def list_task_functions():
     return TASK_FUNCTIONS
@@ -41,6 +43,49 @@ def list_task():
     with session_scope() as session:
         tasks = session.query(Task).filter(Task.enable == True).all()
     return tasks
+
+
+def run_transfer_job():
+    from app.api.services import transfer_service
+
+    transfer_logger.info("scheduled transfer job triggered")
+    with session_scope() as session:
+        transfer_service.transfer_articles(session, trigger="schedule")
+
+
+def push_transfer_job():
+    from app.api.services.config_service import (
+        ARTICLE_TRANSFER_TARGET_CONFIG_KEY,
+        get_default_transfer_target_config,
+        load_config_payload,
+    )
+
+    with session_scope() as session:
+        payload = load_config_payload(ARTICLE_TRANSFER_TARGET_CONFIG_KEY, session)
+
+    config = get_default_transfer_target_config()
+    if isinstance(payload, dict):
+        config.update(payload)
+
+    if not config.get("schedule_enabled"):
+        transfer_logger.info("transfer schedule is disabled")
+        return
+
+    cron_expr = str(config.get("schedule_cron", "")).strip()
+    if not cron_expr:
+        transfer_logger.warning("skip transfer schedule because schedule_cron is empty")
+        return
+
+    try:
+        scheduler.add_job(
+            run_transfer_job,
+            id=TRANSFER_JOB_ID,
+            replace_existing=True,
+            trigger=CronTrigger.from_crontab(expr=cron_expr),
+        )
+        transfer_logger.info(f"transfer schedule registered with cron={cron_expr}")
+    except Exception as exc:
+        transfer_logger.warning(f"skip invalid transfer schedule: {exc}")
 
 
 def push_job():
@@ -61,6 +106,8 @@ def push_job():
             )
         except Exception as exc:
             logger.warning(f"skip invalid task {task.id}: {exc}")
+
+    push_transfer_job()
 
 
 def start_scheduler():
