@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { createFileRoute } from '@tanstack/react-router'
-import { CrawlerCenter } from '@/features/crawler'
+import { CrawlerRoutePage } from '@/features/crawler/route-page'
 
 const crawlerSearchSchema = z.object({
   tab: z.enum(['issues', 'config', 'modules']).optional().catch('issues'),
@@ -8,10 +8,5 @@ const crawlerSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authenticated/crawler/')({
   validateSearch: crawlerSearchSchema,
-  component: CrawlerRoute,
+  component: CrawlerRoutePage,
 })
-
-function CrawlerRoute() {
-  const search = Route.useSearch()
-  return <CrawlerCenter activeTab={search.tab ?? 'issues'} />
-}

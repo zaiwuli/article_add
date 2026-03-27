@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Database, Link2, Power } from 'lucide-react'
 import { toast } from 'sonner'
@@ -35,7 +35,6 @@ function getResourceApiUrl() {
 
 export function ApiCenter() {
   const queryClient = useQueryClient()
-  const [enabled, setEnabled] = useState(true)
 
   const resourceApiUrl = useMemo(() => getResourceApiUrl(), [])
 
@@ -48,16 +47,23 @@ export function ApiCenter() {
     staleTime: 60 * 1000,
   })
 
-  useEffect(() => {
-    if (!apiConfig) {
-      return
-    }
-    setEnabled(Boolean(apiConfig.enabled))
-  }, [apiConfig])
-
   const saveMutation = useMutation({
     mutationFn: async (nextEnabled: boolean) =>
       postConfig<ApiSwitchConfig>(API_SWITCH_KEY, { enabled: nextEnabled }),
+    onMutate: async (nextEnabled) => {
+      const previous = queryClient.getQueryData<ApiSwitchConfig>([
+        'public-article-api-config',
+      ])
+      queryClient.setQueryData(['public-article-api-config'], {
+        enabled: nextEnabled,
+      })
+      return { previous }
+    },
+    onError: (_error, _nextEnabled, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['public-article-api-config'], context.previous)
+      }
+    },
     onSuccess: (res, nextEnabled) => {
       if (res.code === 0) {
         queryClient.setQueryData(['public-article-api-config'], {
@@ -67,6 +73,8 @@ export function ApiCenter() {
       }
     },
   })
+
+  const enabled = Boolean(apiConfig?.enabled ?? true)
 
   const handleCopy = async () => {
     try {
@@ -78,7 +86,6 @@ export function ApiCenter() {
   }
 
   const handleToggle = (checked: boolean) => {
-    setEnabled(checked)
     saveMutation.mutate(checked)
   }
 

@@ -237,7 +237,7 @@ export function CrawlerIssueCenter() {
     },
   })
 
-  const items = data?.items ?? []
+  const items = useMemo(() => data?.items ?? [], [data?.items])
   const summary = data?.summary ?? {
     total: 0,
     failed: 0,

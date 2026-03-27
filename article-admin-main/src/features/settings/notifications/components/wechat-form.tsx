@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Save } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Form,
@@ -51,7 +52,8 @@ Magnet：{{magnet}}`
   })
 
   const onSubmit = (values: z.infer<typeof wechatSchema>) => {
-    console.log('wechat config', values)
+    form.reset(values)
+    toast.success('企业微信通知配置已保存到表单')
   }
 
   return (

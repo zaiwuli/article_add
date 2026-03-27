@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Save } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Form,
@@ -45,7 +46,8 @@ Magnet：{{magnet}}`
   })
 
   const onSubmit = (values: z.infer<typeof telegramSchema>) => {
-    console.log('telegram config', values)
+    form.reset(values)
+    toast.success('Telegram 通知配置已保存到表单')
   }
 
   return (

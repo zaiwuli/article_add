@@ -35,7 +35,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea.tsx'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 
 const crawlerRuntimeSchema = z.object({
   proxy: z.string(),
@@ -219,9 +219,9 @@ export function CrawlerConfigCenter() {
     },
   })
 
-  const runtimeValues = runtimeForm.watch()
-  const autoExtractValues = autoExtractForm.watch()
-  const issueValues = issueHandlingForm.watch()
+  const runtimeValues = useWatch({ control: runtimeForm.control })
+  const autoExtractValues = useWatch({ control: autoExtractForm.control })
+  const issueValues = useWatch({ control: issueHandlingForm.control })
 
   return (
     <div className='space-y-4'>

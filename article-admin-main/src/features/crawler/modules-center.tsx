@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Blocks, Globe2, Plus, Save, Trash2 } from 'lucide-react'
@@ -75,7 +75,10 @@ export function CrawlerModuleCenter() {
     name: 'sections',
   })
 
-  const watchedSections = form.watch('sections')
+  const watchedSections = useWatch({
+    control: form.control,
+    name: 'sections',
+  })
 
   const { data: sectionData, isLoading } = useQuery({
     queryKey: ['crawler-sections'],
