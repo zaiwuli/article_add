@@ -1,4 +1,9 @@
-import Axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from "axios";
+import Axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+  type AxiosResponse,
+} from 'axios'
 import { useAuthStore } from '@/stores/auth-store.ts'
 
 const axios: AxiosInstance = Axios.create({
@@ -8,7 +13,6 @@ const axios: AxiosInstance = Axios.create({
     'Content-Type': 'application/json',
   },
 })
-
 
 axios.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {

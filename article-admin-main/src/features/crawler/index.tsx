@@ -1,16 +1,16 @@
 import { Link } from '@tanstack/react-router'
 import { Blocks, Bug, Settings2, Wrench } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { Badge } from '@/components/ui/badge'
 import { CrawlerConfigCenter } from '@/features/crawler/config-center'
 import { CrawlerIssueCenter } from '@/features/crawler/issue-center'
 import { CrawlerModuleCenter } from '@/features/crawler/modules-center'
-import { cn } from '@/lib/utils'
 
 export type CrawlerTab = 'issues' | 'config' | 'modules'
 

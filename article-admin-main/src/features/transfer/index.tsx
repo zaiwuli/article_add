@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import type { TransferTargetConfig } from '@/types/transfer'
 import {
   ArrowRightLeft,
   Database,
@@ -16,21 +17,9 @@ import {
   saveTransferConfig,
   testTransferConnection,
 } from '@/api/transfer'
-import type { TransferTargetConfig } from '@/types/transfer'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -40,6 +29,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
 
 const DEFAULT_CONFIG: TransferTargetConfig = {
   host: '',
@@ -240,7 +235,9 @@ export function TransferCenter() {
                 <label className='text-sm font-medium'>Schema</label>
                 <Input
                   value={form.schema}
-                  onChange={(event) => updateField('schema', event.target.value)}
+                  onChange={(event) =>
+                    updateField('schema', event.target.value)
+                  }
                 />
               </div>
               <div className='space-y-2'>
@@ -318,7 +315,7 @@ export function TransferCenter() {
               <CardTitle className='text-base'>执行结果</CardTitle>
             </CardHeader>
             <CardContent className='p-5'>
-              <div className='min-h-16 whitespace-pre-wrap text-sm text-muted-foreground'>
+              <div className='min-h-16 text-sm whitespace-pre-wrap text-muted-foreground'>
                 {lastResult || '还没有执行记录。'}
               </div>
             </CardContent>

@@ -3,12 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Database, Link2, Power } from 'lucide-react'
 import { toast } from 'sonner'
 import { getConfig, postConfig } from '@/api/config'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +13,12 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
 
 const API_SWITCH_KEY = 'PublicArticleApi'
 
@@ -61,7 +61,10 @@ export function ApiCenter() {
     },
     onError: (_error, _nextEnabled, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(['public-article-api-config'], context.previous)
+        queryClient.setQueryData(
+          ['public-article-api-config'],
+          context.previous
+        )
       }
     },
     onSuccess: (res, nextEnabled) => {
@@ -129,7 +132,7 @@ export function ApiCenter() {
           <CardContent className='space-y-4'>
             <div className='rounded-xl border p-4'>
               <div className='text-sm text-muted-foreground'>地址</div>
-              <div className='mt-2 break-all font-mono text-sm'>
+              <div className='mt-2 font-mono text-sm break-all'>
                 {resourceApiUrl}
               </div>
             </div>
@@ -137,13 +140,18 @@ export function ApiCenter() {
             <div className='rounded-xl border p-4'>
               <div className='text-sm text-muted-foreground'>可用参数</div>
               <div className='mt-2 flex flex-wrap gap-2'>
-                {['page', 'per_page', 'keyword', 'section', 'category', 'website'].map(
-                  (item) => (
-                    <Badge key={item} variant='secondary'>
-                      {item}
-                    </Badge>
-                  )
-                )}
+                {[
+                  'page',
+                  'per_page',
+                  'keyword',
+                  'section',
+                  'category',
+                  'website',
+                ].map((item) => (
+                  <Badge key={item} variant='secondary'>
+                    {item}
+                  </Badge>
+                ))}
               </div>
             </div>
 

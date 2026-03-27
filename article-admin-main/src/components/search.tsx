@@ -13,7 +13,7 @@ export function Search({
   className = '',
   placeholder = 'Search',
 }: SearchProps) {
-  const { setOpen  } = useSearch()
+  const { setOpen } = useSearch()
   return (
     <Button
       variant='outline'

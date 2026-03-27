@@ -88,17 +88,17 @@
 
 /* ===== 显示（默认） ===== */
 [data-image-mode='show'] img {
-    filter: none;
-    opacity: 1;
+  filter: none;
+  opacity: 1;
 }
 
 /* ===== 模糊 ===== */
 [data-image-mode='blur'] img {
-    filter: blur(16px);
-    transition: filter 0.2s ease;
+  filter: blur(16px);
+  transition: filter 0.2s ease;
 }
 
 /* ===== 隐藏 ===== */
 [data-image-mode='hide'] img {
-    display: none !important;
+  display: none !important;
 }

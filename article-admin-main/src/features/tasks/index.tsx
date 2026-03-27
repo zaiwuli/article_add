@@ -1,9 +1,9 @@
 import { ConfigDrawer } from '@/components/config-drawer'
+import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import TaskManager from '@/features/tasks/components/task-manager.tsx'
 
 export function Tasks() {

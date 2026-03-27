@@ -1,7 +1,4 @@
-import {
-  ChevronsUpDown,
-  LogOut,
-} from 'lucide-react'
+import { ChevronsUpDown, LogOut } from 'lucide-react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import {

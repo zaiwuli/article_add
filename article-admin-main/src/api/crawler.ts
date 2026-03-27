@@ -1,10 +1,10 @@
-import { request } from './request'
 import type {
   CrawlerAutoProcessResult,
   CrawlerIssueListResult,
   CrawlerPreviewResult,
   CrawlerSaveResult,
 } from '@/types/config.ts'
+import { request } from './request'
 
 export function previewCrawlerUrl(url: string) {
   return request<CrawlerPreviewResult>({

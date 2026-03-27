@@ -18,7 +18,10 @@ export function normalizeRedirectTarget(redirectTo?: string) {
       return redirectTo
     }
 
-    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+    const base =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : 'http://localhost'
     const url = new URL(redirectTo, base)
     return buildRedirectTarget(url.pathname, url.search, url.hash)
   } catch {

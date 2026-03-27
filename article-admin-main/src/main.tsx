@@ -8,16 +8,15 @@ import {
 } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
-
 import { useAuthStore } from '@/stores/auth-store'
 import { buildRedirectTarget } from '@/lib/auth-redirect'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ImageModeProvider } from '@/context/image-mode-provider.tsx'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
 import { routeTree } from './routeTree.gen'
 import './styles/index.css'
-import { ImageModeProvider } from '@/context/image-mode-provider.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {

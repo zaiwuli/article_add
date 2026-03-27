@@ -1,5 +1,5 @@
-import * as React from "react";
-import { useIsMobile } from '@/hooks/use-mobile.tsx';
+import * as React from 'react'
+import { useIsMobile } from '@/hooks/use-mobile.tsx'
 import {
   Dialog,
   DialogContent,
@@ -17,12 +17,6 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 
-
-
-
-
-
-
 interface ResponsiveModalProps {
   title: string
   children: React.ReactNode
@@ -32,12 +26,12 @@ interface ResponsiveModalProps {
 }
 
 export function ResponsiveModal({
-                                  title,
-                                  children,
-                                  trigger,
-                                  open,
-                                  onOpenChange,
-                                }: ResponsiveModalProps) {
+  title,
+  children,
+  trigger,
+  open,
+  onOpenChange,
+}: ResponsiveModalProps) {
   // 这里的 (min-width: 768px) 是常见的桌面端断点
   const isMobile = useIsMobile()
 
@@ -48,7 +42,7 @@ export function ResponsiveModal({
         <DialogContent className='w-auto max-w-none sm:max-w-none'>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription/>
+            <DialogDescription />
           </DialogHeader>
           {children}
         </DialogContent>
@@ -60,13 +54,11 @@ export function ResponsiveModal({
     <Drawer open={open} onOpenChange={onOpenChange}>
       {trigger && <DrawerTrigger asChild>{trigger}</DrawerTrigger>}
       <DrawerContent>
-        <DrawerHeader className="text-left">
+        <DrawerHeader className='text-left'>
           <DrawerTitle>{title}</DrawerTitle>
-          <DrawerDescription/>
+          <DrawerDescription />
         </DrawerHeader>
-        <div className="px-4 pb-4">
-          {children}
-        </div>
+        <div className='px-4 pb-4'>{children}</div>
       </DrawerContent>
     </Drawer>
   )

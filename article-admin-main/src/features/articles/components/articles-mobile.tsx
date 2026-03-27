@@ -19,32 +19,27 @@ export function ArticlesMobile() {
   })
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['articles-infinite', filter, debouncedKeyword],
-    queryFn: async ({ pageParam = 1 }) => {
-      const res = await getArticles({
-        page: pageParam,
-        pageSize: PAGE_SIZE,
-        filter: { ...filter, keyword: debouncedKeyword },
-      })
-      return res.data
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      const currentTotal = allPages.reduce(
-        (count, page) => count + page.items.length,
-        0
-      )
-      return currentTotal < lastPage.total ? allPages.length + 1 : undefined
-    },
-    initialPageParam: 1,
-    staleTime: 5 * 60 * 1000,
-  })
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useInfiniteQuery({
+      queryKey: ['articles-infinite', filter, debouncedKeyword],
+      queryFn: async ({ pageParam = 1 }) => {
+        const res = await getArticles({
+          page: pageParam,
+          pageSize: PAGE_SIZE,
+          filter: { ...filter, keyword: debouncedKeyword },
+        })
+        return res.data
+      },
+      getNextPageParam: (lastPage, allPages) => {
+        const currentTotal = allPages.reduce(
+          (count, page) => count + page.items.length,
+          0
+        )
+        return currentTotal < lastPage.total ? allPages.length + 1 : undefined
+      },
+      initialPageParam: 1,
+      staleTime: 5 * 60 * 1000,
+    })
 
   const { data: categories } = useQuery({
     queryKey: ['category'],

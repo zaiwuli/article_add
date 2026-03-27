@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react'
+import { z } from 'zod'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { CrawlerSection } from '@/types/config'
 import { Blocks, Globe2, Plus, Save, Trash2 } from 'lucide-react'
-import { z } from 'zod'
 import { toast } from 'sonner'
 import { getConfig, postConfig } from '@/api/config'
-import type { CrawlerSection } from '@/types/config'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -55,7 +55,7 @@ function SummaryCard({
   return (
     <div className='rounded-xl border bg-card px-4 py-3 shadow-sm'>
       <div className='text-xs text-muted-foreground'>{title}</div>
-      <div className='mt-2 text-2xl font-semibold leading-none'>{value}</div>
+      <div className='mt-2 text-2xl leading-none font-semibold'>{value}</div>
       <div className='mt-2 text-xs text-muted-foreground'>{description}</div>
     </div>
   )
@@ -128,7 +128,8 @@ export function CrawlerModuleCenter() {
     return {
       total: normalized.length,
       named: normalized.filter((item) => item.section).length,
-      websites: new Set(normalized.map((item) => item.website || 'sehuatang')).size,
+      websites: new Set(normalized.map((item) => item.website || 'sehuatang'))
+        .size,
     }
   }, [watchedSections])
 
@@ -184,7 +185,9 @@ export function CrawlerModuleCenter() {
               <Button
                 type='button'
                 size='sm'
-                onClick={form.handleSubmit((values) => saveMutation.mutate(values))}
+                onClick={form.handleSubmit((values) =>
+                  saveMutation.mutate(values)
+                )}
                 disabled={saveMutation.isPending}
               >
                 <Save className='h-4 w-4' />
@@ -198,7 +201,9 @@ export function CrawlerModuleCenter() {
           <Form {...form}>
             <form className='space-y-3'>
               {isLoading && (
-                <p className='text-sm text-muted-foreground'>正在加载抓取模块...</p>
+                <p className='text-sm text-muted-foreground'>
+                  正在加载抓取模块...
+                </p>
               )}
 
               {fields.length === 0 && !isLoading && (
@@ -219,7 +224,9 @@ export function CrawlerModuleCenter() {
                           <Blocks className='h-4 w-4' />
                         </div>
                         <div>
-                          <p className='text-sm font-medium'>模块 {index + 1}</p>
+                          <p className='text-sm font-medium'>
+                            模块 {index + 1}
+                          </p>
                           <p className='text-xs text-muted-foreground'>
                             设置 FID、名称和站点标识
                           </p>
@@ -246,7 +253,11 @@ export function CrawlerModuleCenter() {
                             <FormItem>
                               <FormLabel className='text-[11px]'>FID</FormLabel>
                               <FormControl>
-                                <Input className='h-9' placeholder='142' {...field} />
+                                <Input
+                                  className='h-9'
+                                  placeholder='142'
+                                  {...field}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -258,7 +269,9 @@ export function CrawlerModuleCenter() {
                           name={`sections.${index}.section`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className='text-[11px]'>模块名称</FormLabel>
+                              <FormLabel className='text-[11px]'>
+                                模块名称
+                              </FormLabel>
                               <FormControl>
                                 <Input
                                   className='h-9'

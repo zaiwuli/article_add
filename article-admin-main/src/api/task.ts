@@ -1,6 +1,6 @@
+import type { TaskFunction } from '@/types/config.ts'
 import { request } from '@/api/request.ts'
 import type { Task } from '@/features/tasks/components/task-manager.tsx'
-import type { TaskFunction } from '@/types/config.ts'
 
 export function getTasks() {
   return request<Task[]>({ url: '/tasks/' })

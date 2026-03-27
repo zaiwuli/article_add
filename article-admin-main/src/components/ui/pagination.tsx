@@ -54,9 +54,4 @@ function PaginationLink({
   )
 }
 
-export {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-}
+export { Pagination, PaginationContent, PaginationItem, PaginationLink }

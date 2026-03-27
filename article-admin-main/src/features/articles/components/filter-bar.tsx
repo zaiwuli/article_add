@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { ArticleFilter, Category } from '@/types/article'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface FilterBarProps {
   value: ArticleFilter
@@ -20,9 +20,9 @@ export function FilterBar({ value, categories, onChange }: FilterBarProps) {
 
     const scrollArea = scrollAreaRef.current
     const tabsList = tabsListRef.current
-    const activeTab = tabsList.querySelector('[data-state="active"]') as
-      | HTMLElement
-      | null
+    const activeTab = tabsList.querySelector(
+      '[data-state="active"]'
+    ) as HTMLElement | null
 
     if (!activeTab) {
       return

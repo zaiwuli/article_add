@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { getBootstrapStatus } from '@/api/user.ts'
 import {
   Card,
@@ -30,8 +30,8 @@ export function SignUp() {
             {isLoading
               ? '正在检查系统是否已存在账号...'
               : bootstrapStatus?.allow_register
-              ? '系统还没有管理员账号，先创建第一个登录账号。'
-              : `系统已经内置测试账号 ${bootstrapStatus?.default_username || 'admin'} / ${bootstrapStatus?.default_password || 'admin'}，不再开放初始化注册。`}
+                ? '系统还没有管理员账号，先创建第一个登录账号。'
+                : `系统已经内置测试账号 ${bootstrapStatus?.default_username || 'admin'} / ${bootstrapStatus?.default_password || 'admin'}，不再开放初始化注册。`}
           </CardDescription>
         </CardHeader>
         <CardContent>

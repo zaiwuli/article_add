@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
+import { z } from 'zod'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {
+  CrawlerAutoExtractConfig,
+  CrawlerIssueHandlingConfig,
+  CrawlerRuntimeConfig,
+} from '@/types/config'
 import {
   FolderSearch,
   Network,
@@ -8,14 +15,8 @@ import {
   ShieldCheck,
   ShieldEllipsis,
 } from 'lucide-react'
-import { z } from 'zod'
 import { toast } from 'sonner'
 import { getConfig, postConfig } from '@/api/config'
-import type {
-  CrawlerAutoExtractConfig,
-  CrawlerIssueHandlingConfig,
-  CrawlerRuntimeConfig,
-} from '@/types/config'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -35,7 +36,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea.tsx'
-import { useForm, useWatch } from 'react-hook-form'
 
 const crawlerRuntimeSchema = z.object({
   proxy: z.string(),
@@ -79,7 +79,7 @@ function SummaryCard({
   return (
     <div className='rounded-xl border bg-card px-4 py-3 shadow-sm'>
       <div className='text-xs text-muted-foreground'>{title}</div>
-      <div className='mt-2 text-lg font-semibold leading-none'>{value}</div>
+      <div className='mt-2 text-lg leading-none font-semibold'>{value}</div>
       <div className='mt-2 text-xs text-muted-foreground'>{description}</div>
     </div>
   )
@@ -96,13 +96,15 @@ export function CrawlerConfigCenter() {
     },
   })
 
-  const issueHandlingForm = useForm<z.infer<typeof crawlerIssueHandlingSchema>>({
-    resolver: zodResolver(crawlerIssueHandlingSchema),
-    defaultValues: {
-      watch_path: '',
-      output_path: '',
-    },
-  })
+  const issueHandlingForm = useForm<z.infer<typeof crawlerIssueHandlingSchema>>(
+    {
+      resolver: zodResolver(crawlerIssueHandlingSchema),
+      defaultValues: {
+        watch_path: '',
+        output_path: '',
+      },
+    }
+  )
 
   const autoExtractForm = useForm<z.infer<typeof crawlerAutoExtractSchema>>({
     resolver: zodResolver(crawlerAutoExtractSchema),
@@ -118,24 +120,28 @@ export function CrawlerConfigCenter() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: issueHandlingData, isLoading: isIssueHandlingLoading } = useQuery({
-    queryKey: ['crawler-issue-config'],
-    queryFn: async () => {
-      const res = await getConfig<CrawlerIssueHandlingConfig>('CrawlerIssueHandling')
-      return (
-        res.data ?? {
-          watch_path: '',
-          output_path: '',
-        }
-      )
-    },
-    staleTime: 5 * 60 * 1000,
-  })
+  const { data: issueHandlingData, isLoading: isIssueHandlingLoading } =
+    useQuery({
+      queryKey: ['crawler-issue-config'],
+      queryFn: async () => {
+        const res = await getConfig<CrawlerIssueHandlingConfig>(
+          'CrawlerIssueHandling'
+        )
+        return (
+          res.data ?? {
+            watch_path: '',
+            output_path: '',
+          }
+        )
+      },
+      staleTime: 5 * 60 * 1000,
+    })
 
   const { data: autoExtractData, isLoading: isAutoExtractLoading } = useQuery({
     queryKey: ['crawler-auto-extract'],
     queryFn: async () => {
-      const res = await getConfig<CrawlerAutoExtractConfig>('CrawlerAutoExtract')
+      const res =
+        await getConfig<CrawlerAutoExtractConfig>('CrawlerAutoExtract')
       return res.data ?? DEFAULT_AUTO_EXTRACT
     },
     staleTime: 5 * 60 * 1000,
@@ -234,7 +240,9 @@ export function CrawlerConfigCenter() {
         <SummaryCard
           title='处理目录'
           value={
-            issueValues.watch_path && issueValues.output_path ? '已就绪' : '待配置'
+            issueValues.watch_path && issueValues.output_path
+              ? '已就绪'
+              : '待配置'
           }
           description='附件先进入监控目录，再落到解压输出目录。'
         />
@@ -265,7 +273,9 @@ export function CrawlerConfigCenter() {
                 className='space-y-4'
               >
                 {isRuntimeLoading && (
-                  <p className='text-sm text-muted-foreground'>正在加载抓取网络...</p>
+                  <p className='text-sm text-muted-foreground'>
+                    正在加载抓取网络...
+                  </p>
                 )}
 
                 <FormField
@@ -393,7 +403,11 @@ export function CrawlerConfigCenter() {
                       <FormItem>
                         <FormLabel>Cron 表达式</FormLabel>
                         <FormControl>
-                          <Input className='h-10' placeholder='*/10 * * * *' {...field} />
+                          <Input
+                            className='h-10'
+                            placeholder='*/10 * * * *'
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -407,7 +421,11 @@ export function CrawlerConfigCenter() {
                       <FormItem>
                         <FormLabel>归档目录</FormLabel>
                         <FormControl>
-                          <Input className='h-10' placeholder='例如：D:\\archive' {...field} />
+                          <Input
+                            className='h-10'
+                            placeholder='例如：D:\\archive'
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -433,7 +451,10 @@ export function CrawlerConfigCenter() {
                             onCheckedChange={(checked) => {
                               field.onChange(checked)
                               if (checked) {
-                                autoExtractForm.setValue('delete_original', false)
+                                autoExtractForm.setValue(
+                                  'delete_original',
+                                  false
+                                )
                               }
                             }}
                           />
@@ -493,7 +514,10 @@ export function CrawlerConfigCenter() {
                   )}
                 />
 
-                <Button type='submit' disabled={saveAutoExtractMutation.isPending}>
+                <Button
+                  type='submit'
+                  disabled={saveAutoExtractMutation.isPending}
+                >
                   <Save className='h-4 w-4' />
                   {saveAutoExtractMutation.isPending
                     ? '保存中...'
@@ -579,9 +603,14 @@ export function CrawlerConfigCenter() {
                 </div>
               </div>
 
-              <Button type='submit' disabled={saveIssueHandlingMutation.isPending}>
+              <Button
+                type='submit'
+                disabled={saveIssueHandlingMutation.isPending}
+              >
                 <Save className='h-4 w-4' />
-                {saveIssueHandlingMutation.isPending ? '保存中...' : '保存处理目录'}
+                {saveIssueHandlingMutation.isPending
+                  ? '保存中...'
+                  : '保存处理目录'}
               </Button>
             </form>
           </Form>

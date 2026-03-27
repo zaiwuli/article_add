@@ -3,7 +3,6 @@ import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
 
 export const ACCESS_TOKEN = 'thisisjustarandomstring'
 
-
 interface AuthState {
   auth: {
     accessToken: string

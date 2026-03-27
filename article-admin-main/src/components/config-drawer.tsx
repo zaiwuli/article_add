@@ -1,25 +1,30 @@
-import { type SVGProps } from 'react';
+import { type SVGProps } from 'react'
 import { Root as Radio, Item } from '@radix-ui/react-radio-group'
 import { CircleCheck, Monitor, RotateCcw } from 'lucide-react'
-import { IconDir } from '@/assets/custom/icon-dir';
-import { IconLayoutCompact } from '@/assets/custom/icon-layout-compact';
-import { IconLayoutDefault } from '@/assets/custom/icon-layout-default';
-import { IconLayoutFull } from '@/assets/custom/icon-layout-full';
-import { IconSidebarFloating } from '@/assets/custom/icon-sidebar-floating';
-import { IconSidebarSidebar } from '@/assets/custom/icon-sidebar-sidebar';
-import { IconThemeDark } from '@/assets/custom/icon-theme-dark';
-import { IconThemeLight } from '@/assets/custom/icon-theme-light';
-import { IconThemeSystem } from '@/assets/custom/icon-theme-system';
-import { cn } from '@/lib/utils';
-import { useDirection } from '@/context/direction-provider';
-import { type Collapsible, useLayout } from '@/context/layout-provider';
-import { useTheme } from '@/context/theme-provider';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { useSidebar } from './ui/sidebar';
-
-
-
+import { IconDir } from '@/assets/custom/icon-dir'
+import { IconLayoutCompact } from '@/assets/custom/icon-layout-compact'
+import { IconLayoutDefault } from '@/assets/custom/icon-layout-default'
+import { IconLayoutFull } from '@/assets/custom/icon-layout-full'
+import { IconSidebarFloating } from '@/assets/custom/icon-sidebar-floating'
+import { IconSidebarSidebar } from '@/assets/custom/icon-sidebar-sidebar'
+import { IconThemeDark } from '@/assets/custom/icon-theme-dark'
+import { IconThemeLight } from '@/assets/custom/icon-theme-light'
+import { IconThemeSystem } from '@/assets/custom/icon-theme-system'
+import { cn } from '@/lib/utils'
+import { useDirection } from '@/context/direction-provider'
+import { type Collapsible, useLayout } from '@/context/layout-provider'
+import { useTheme } from '@/context/theme-provider'
+import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { useSidebar } from './ui/sidebar'
 
 export function ConfigDrawer() {
   const { setOpen } = useSidebar()

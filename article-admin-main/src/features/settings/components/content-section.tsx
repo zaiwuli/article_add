@@ -21,13 +21,11 @@ export function ContentSection({
   icon,
 }: ContentSectionProps) {
   return (
-    <Card className='space-y-4 mt-6'>
+    <Card className='mt-6 space-y-4'>
       <CardHeader>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-3'>
-            <div className='rounded-lg bg-primary/10 p-2'>
-              {icon}
-            </div>
+            <div className='rounded-lg bg-primary/10 p-2'>{icon}</div>
             <div>
               <CardTitle>{title}</CardTitle>
               <CardDescription>{desc}</CardDescription>

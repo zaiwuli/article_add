@@ -1,5 +1,5 @@
-import { Link, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { Link, useSearch } from '@tanstack/react-router'
 import { getBootstrapStatus } from '@/api/user.ts'
 import {
   Card,

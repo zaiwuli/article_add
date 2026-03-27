@@ -5,8 +5,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 export function CategoryCards({ data }: { data: Category[] }) {
   return (
     <div className='grid grid-cols-2 gap-4 md:grid-cols-6'>
-      {data.map((cat,index) => (
-        <Card className='bg-gradient-to-br from-background to-muted transition hover:shadow-lg' key={index}>
+      {data.map((cat, index) => (
+        <Card
+          className='bg-gradient-to-br from-background to-muted transition hover:shadow-lg'
+          key={index}
+        >
           <CardHeader className='flex flex-row items-center justify-between'>
             <CardTitle className='text-sm'>{cat.category}</CardTitle>
             <Layers className='h-4 w-4 text-muted-foreground' />

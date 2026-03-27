@@ -6,8 +6,8 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { ArticlesMobile } from '@/features/articles/components/articles-mobile'
 import { ArticlesDesktop } from '@/features/articles/components/articles-desktop'
+import { ArticlesMobile } from '@/features/articles/components/articles-mobile'
 
 export function Articles() {
   const isMobile = useIsMobile()

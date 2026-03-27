@@ -1,15 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { getCategories } from '@/api/article.ts'
-
 import { ConfigDrawer } from '@/components/config-drawer'
+import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { CategoryCards } from '@/features/dashboard/components/category-cards.tsx'
 import { SummaryCards } from '@/features/dashboard/components/summary-cards.tsx'
-import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 
 export function Dashboard() {
   const { data } = useQuery({
@@ -26,7 +24,7 @@ export function Dashboard() {
       <Header fixed>
         <div className='ms-auto flex items-center space-x-4'>
           <Search />
-          <ImageModeSwitch/>
+          <ImageModeSwitch />
           <ThemeSwitch />
           <ConfigDrawer />
         </div>

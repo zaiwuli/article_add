@@ -3,6 +3,7 @@ import * as z from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { CrawlerSection, TaskFunction } from '@/types/config.ts'
 import { Clock, Pencil, Play, Plus, Trash2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { getConfig } from '@/api/config.ts'
@@ -14,7 +15,6 @@ import {
   runTask,
   updateTask,
 } from '@/api/task.ts'
-import type { CrawlerSection, TaskFunction } from '@/types/config.ts'
 import { cn } from '@/lib/utils.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -328,7 +328,10 @@ export default function TaskManager() {
                   <FormItem>
                     <FormLabel>执行函数</FormLabel>
                     <FormControl>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <SelectTrigger className='w-full'>
                           <SelectValue placeholder='选择执行函数' />
                         </SelectTrigger>
@@ -500,7 +503,7 @@ export default function TaskManager() {
                     <FormControl>
                       <div className='relative'>
                         <Input {...field} />
-                        <Clock className='absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                        <Clock className='absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
                       </div>
                     </FormControl>
                     <FormDescription>
@@ -588,7 +591,8 @@ export default function TaskManager() {
                       执行函数
                     </span>
                     <Badge variant='outline' className='font-mono'>
-                      {taskFunctionLabelMap.get(task.task_func) || task.task_func}
+                      {taskFunctionLabelMap.get(task.task_func) ||
+                        task.task_func}
                     </Badge>
                   </TableCell>
 
@@ -598,7 +602,11 @@ export default function TaskManager() {
                     </span>
                     <div className='space-y-1 text-right md:text-left'>
                       <p className='text-sm'>
-                        页数：{getPageRangeLabel(parsedArgs.start_page, parsedArgs.max_page)}
+                        页数：
+                        {getPageRangeLabel(
+                          parsedArgs.start_page,
+                          parsedArgs.max_page
+                        )}
                       </p>
                       <p className='max-w-[320px] text-xs text-muted-foreground'>
                         {selectedSections || '未配置模块'}

@@ -5,7 +5,6 @@ type User = {
   avatar: string
 }
 
-
 type BaseNavItem = {
   title: string
   badge?: string

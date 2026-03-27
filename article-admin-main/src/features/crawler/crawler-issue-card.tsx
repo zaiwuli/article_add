@@ -78,7 +78,7 @@ export function CrawlerIssueCard({
 
   return (
     <Card className='group relative flex w-full max-w-full flex-col gap-3 overflow-hidden rounded-xl p-3 transition-all duration-300 hover:shadow-lg sm:flex-row'>
-      <div className='absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-sky-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100' />
+      <div className='absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-sky-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100' />
 
       <ResponsiveModal
         title='图片预览'
@@ -122,7 +122,7 @@ export function CrawlerIssueCard({
                 size='icon'
                 variant='ghost'
                 onClick={prevImage}
-                className='absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
+                className='absolute top-1/2 left-4 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
               >
                 <ChevronLeft className='h-6 w-6' />
               </Button>
@@ -130,7 +130,7 @@ export function CrawlerIssueCard({
                 size='icon'
                 variant='ghost'
                 onClick={nextImage}
-                className='absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
+                className='absolute top-1/2 right-4 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
               >
                 <ChevronRight className='h-6 w-6' />
               </Button>
@@ -161,13 +161,17 @@ export function CrawlerIssueCard({
         </div>
 
         <div className='space-y-2'>
-          <h6 className='break-words text-sm font-semibold leading-snug sm:text-[15px]'>
+          <h6 className='text-sm leading-snug font-semibold break-words sm:text-[15px]'>
             {issue.title || `tid=${issue.tid}`}
           </h6>
           <p className='text-sm text-muted-foreground'>{reasonText}</p>
           <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
-            <span className='rounded-full border px-2.5 py-1'>{issue.website}</span>
-            <span className='rounded-full border px-2.5 py-1'>{stageLabel}</span>
+            <span className='rounded-full border px-2.5 py-1'>
+              {issue.website}
+            </span>
+            <span className='rounded-full border px-2.5 py-1'>
+              {stageLabel}
+            </span>
             {issue.retry_count > 0 && (
               <span className='rounded-full border px-2.5 py-1'>
                 重试 {issue.retry_count}

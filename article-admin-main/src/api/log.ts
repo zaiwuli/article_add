@@ -1,5 +1,5 @@
-import { request } from './request'
 import type { LogContentResult, LogScopeResult } from '@/types/log.ts'
+import { request } from './request'
 
 export function getLogFiles() {
   return request<LogScopeResult>({

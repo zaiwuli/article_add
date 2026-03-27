@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { CrawlerIssueItem } from '@/types/config'
 import {
   HardDriveDownload,
   Play,
@@ -16,9 +17,6 @@ import {
   processCrawlerIssuesAuto,
   retryCrawlerIssue,
 } from '@/api/crawler'
-import type { CrawlerIssueItem } from '@/types/config'
-import { ArticlePagination } from '@/features/articles/components/pagination'
-import { CrawlerIssueCard } from '@/features/crawler/crawler-issue-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ArticlePagination } from '@/features/articles/components/pagination'
+import { CrawlerIssueCard } from '@/features/crawler/crawler-issue-card'
 
 const ISSUE_PAGE_SIZE = 20
 
@@ -145,7 +145,7 @@ function SummaryBadge({
   return (
     <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
       <div className='text-[11px] text-muted-foreground'>{label}</div>
-      <div className='mt-1 text-base font-semibold leading-none'>{value}</div>
+      <div className='mt-1 text-base leading-none font-semibold'>{value}</div>
     </div>
   )
 }
@@ -289,9 +289,21 @@ export function CrawlerIssueCenter() {
         <CardContent className='space-y-3 p-4'>
           <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
             <SummaryBadge label='异常总数' value={summary.total} />
-            <SummaryBadge label='失败待处理' value={summary.failed} tone='warn' />
-            <SummaryBadge label='待下载' value={summary.pending_manual} tone='info' />
-            <SummaryBadge label='已下载待导入' value={summary.downloaded} tone='success' />
+            <SummaryBadge
+              label='失败待处理'
+              value={summary.failed}
+              tone='warn'
+            />
+            <SummaryBadge
+              label='待下载'
+              value={summary.pending_manual}
+              tone='info'
+            />
+            <SummaryBadge
+              label='已下载待导入'
+              value={summary.downloaded}
+              tone='success'
+            />
             <SummaryBadge
               label='自动解压'
               value={autoExtract?.enabled ? '已开启' : '已关闭'}
@@ -333,7 +345,9 @@ export function CrawlerIssueCenter() {
                 <SelectItem value='all'>全部类型</SelectItem>
                 <SelectItem value='archive_detected'>压缩包附件</SelectItem>
                 <SelectItem value='resource_missing'>资源缺失</SelectItem>
-                <SelectItem value='detail_fetch_failed'>详情抓取失败</SelectItem>
+                <SelectItem value='detail_fetch_failed'>
+                  详情抓取失败
+                </SelectItem>
                 <SelectItem value='crawl_exception'>解析异常</SelectItem>
               </SelectContent>
             </Select>
@@ -378,7 +392,8 @@ export function CrawlerIssueCenter() {
               className='h-9'
               onClick={() => batchDownloadMutation.mutate()}
               disabled={
-                batchDownloadMutation.isPending || pendingArchiveIds.length === 0
+                batchDownloadMutation.isPending ||
+                pendingArchiveIds.length === 0
               }
             >
               <HardDriveDownload className='h-4 w-4' />

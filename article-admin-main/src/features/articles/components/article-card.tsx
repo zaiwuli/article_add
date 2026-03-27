@@ -75,7 +75,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
 
   return (
     <Card className='group relative flex w-full max-w-full flex-col gap-4 overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl sm:flex-row'>
-      <div className='absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-blue-500 via-sky-500 to-teal-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100' />
+      <div className='absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-blue-500 via-sky-500 to-teal-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100' />
 
       <ResponsiveModal
         title='图片预览'
@@ -121,7 +121,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
                 size='icon'
                 variant='ghost'
                 onClick={prevImage}
-                className='absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
+                className='absolute top-1/2 left-4 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
               >
                 <ChevronLeft className='h-6 w-6' />
               </Button>
@@ -130,7 +130,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
                 size='icon'
                 variant='ghost'
                 onClick={nextImage}
-                className='absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
+                className='absolute top-1/2 right-4 -translate-y-1/2 rounded-full bg-black/70 text-white hover:bg-black/90 hover:text-white'
               >
                 <ChevronRight className='h-6 w-6' />
               </Button>
@@ -169,9 +169,13 @@ export function ArticleCard({ article }: ArticleCardProps) {
       <div className='flex min-w-0 flex-1 flex-col gap-3'>
         <div className='flex flex-wrap items-center gap-2 text-xs'>
           <Badge variant='secondary'>{article.section}</Badge>
-          {article.category && <Badge variant='outline'>{article.category}</Badge>}
+          {article.category && (
+            <Badge variant='outline'>{article.category}</Badge>
+          )}
           {article.publish_date && (
-            <span className='text-muted-foreground'>{article.publish_date}</span>
+            <span className='text-muted-foreground'>
+              {article.publish_date}
+            </span>
           )}
           {article.size && (
             <span className='rounded-full bg-muted px-2.5 py-1 font-medium'>
@@ -180,10 +184,10 @@ export function ArticleCard({ article }: ArticleCardProps) {
           )}
         </div>
 
-          <TooltipProvider>
+        <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <h6 className='line-clamp-2 cursor-default break-words text-base font-semibold leading-snug transition-colors group-hover:text-primary sm:text-sm'>
+              <h6 className='line-clamp-2 cursor-default text-base leading-snug font-semibold break-words transition-colors group-hover:text-primary sm:text-sm'>
                 {article.title}
               </h6>
             </TooltipTrigger>
@@ -191,10 +195,12 @@ export function ArticleCard({ article }: ArticleCardProps) {
               <p className='text-sm'>{article.title}</p>
             </TooltipContent>
           </Tooltip>
-          </TooltipProvider>
+        </TooltipProvider>
 
         <div className='mt-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
-          <span className='rounded-full border px-2.5 py-1'>{article.website}</span>
+          <span className='rounded-full border px-2.5 py-1'>
+            {article.website}
+          </span>
           {edk && <span className='rounded-full border px-2.5 py-1'>ED2K</span>}
           {article.detail_url && (
             <a
@@ -212,24 +218,24 @@ export function ArticleCard({ article }: ArticleCardProps) {
 
       <div className='flex w-full gap-2 sm:w-auto sm:flex-col sm:justify-center'>
         {magnet && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size='sm'
-                className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
-                onClick={() => handleCopy(magnet, '磁力链接已复制')}
-              >
-                <Copy className='h-4 w-4' />
-                <span className='hidden sm:inline'>复制 Magnet</span>
-                <span className='sm:hidden'>Magnet</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side='left' sideOffset={8}>
-              <p>复制磁力链接</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size='sm'
+                  className='flex-1 shadow-md transition-all hover:shadow-lg sm:w-28 sm:flex-none'
+                  onClick={() => handleCopy(magnet, '磁力链接已复制')}
+                >
+                  <Copy className='h-4 w-4' />
+                  <span className='hidden sm:inline'>复制 Magnet</span>
+                  <span className='sm:hidden'>Magnet</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side='left' sideOffset={8}>
+                <p>复制磁力链接</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {edk && (

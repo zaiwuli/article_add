@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
 // https://vite.dev/config/
 export default defineConfig({
   server: {
@@ -14,11 +15,7 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    allowedHosts: [
-      'article.05730116.xyz',
-      'dev.example.com',
-      'localhost'
-    ]
+    allowedHosts: ['article.05730116.xyz', 'dev.example.com', 'localhost'],
   },
   plugins: [
     tanstackRouter({
@@ -32,11 +29,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'inline',
       base: '/',
-      includeAssets: [
-        'favicon.ico',
-        'apple-touch-icon.png',
-        'icons/*.png',
-      ],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
 
       manifest: {
         name: 'Downloader Manager',
@@ -50,7 +43,7 @@ export default defineConfig({
             src: '/logo.jpg',
             sizes: '512x512',
             type: 'image/jpeg"',
-          }
+          },
         ],
       },
     }),
