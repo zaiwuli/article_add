@@ -85,7 +85,7 @@ function SummaryCard({
   )
 }
 
-export function CrawlerForm() {
+export function CrawlerConfigCenter() {
   const queryClient = useQueryClient()
 
   const runtimeForm = useForm<z.infer<typeof crawlerRuntimeSchema>>({

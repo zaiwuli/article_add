@@ -7,9 +7,9 @@ import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
+import { CrawlerConfigCenter } from '@/features/crawler/config-center'
 import { CrawlerIssueCenter } from '@/features/crawler/issue-center'
 import { CrawlerModuleCenter } from '@/features/crawler/modules-center'
-import { CrawlerForm } from '@/features/settings/crawler/crawler-form'
 import { cn } from '@/lib/utils'
 
 export type CrawlerTab = 'issues' | 'config' | 'modules'
@@ -119,7 +119,7 @@ export function CrawlerCenter({ activeTab }: { activeTab: CrawlerTab }) {
         </div>
 
         {activeTab === 'issues' && <CrawlerIssueCenter />}
-        {activeTab === 'config' && <CrawlerForm />}
+        {activeTab === 'config' && <CrawlerConfigCenter />}
         {activeTab === 'modules' && <CrawlerModuleCenter />}
       </Main>
     </>
