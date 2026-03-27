@@ -6,8 +6,6 @@ from sqlalchemy.orm import Session
 from app.core import settings
 from app.core.config import data_path
 from app.models import Config
-from app.scheduler import list_task_functions
-from app.scheduler.sht_section_registry import list_section_configs
 from app.schemas.config import JsonPayload
 from app.schemas.response import success
 
@@ -81,9 +79,13 @@ def is_public_article_api_enabled(db: Session) -> bool:
 
 def get_option(key, db: Session):
     if key == "TaskFunction":
+        from app.scheduler import list_task_functions
+
         return success(list_task_functions())
 
     if key == CRAWLER_SECTION_CONFIG_KEY:
+        from app.scheduler.sht_section_registry import list_section_configs
+
         return success(list_section_configs())
 
     if key == CRAWLER_RUNTIME_CONFIG_KEY:

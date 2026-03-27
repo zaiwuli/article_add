@@ -5,48 +5,59 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.core.database import session_scope
 from app.models.task import Task
-from app.scheduler.sht_sheduler import (
-    sync_crawl_issue_outputs,
-    sync_sht_by_max_page,
-    sync_sht_by_tid,
-)
 from app.utils.log import logger, transfer_logger
 
 scheduler = AsyncIOScheduler()
 
-TASK_FUNCTIONS = [
-    {
-        "func_name": "sync_sht_by_tid",
-        "func_label": "Sync Latest Threads",
-        "func_args_description": (
-            'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":100}'
-        ),
-    },
-    {
-        "func_name": "sync_sht_by_max_page",
-        "func_label": "Sync By Page Range",
-        "func_args_description": (
-            'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":5}'
-        ),
-    },
-    {
-        "func_name": "sync_crawl_issue_outputs",
-        "func_label": "Import Crawl Issue Outputs",
-        "func_args_description": "No extra args required. Scans output_path and imports txt/torrent/nfo results.",
-    },
-]
-
-FUNC_MAP = {
-    "sync_sht_by_tid": sync_sht_by_tid,
-    "sync_sht_by_max_page": sync_sht_by_max_page,
-    "sync_crawl_issue_outputs": sync_crawl_issue_outputs,
-}
-
 TRANSFER_JOB_ID = "article_transfer_schedule"
 
 
+def _load_task_registry():
+    from app.scheduler.sht_sheduler import (
+        sync_crawl_issue_outputs,
+        sync_sht_by_max_page,
+        sync_sht_by_tid,
+    )
+
+    task_functions = [
+        {
+            "func_name": "sync_sht_by_tid",
+            "func_label": "Sync Latest Threads",
+            "func_args_description": (
+                'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":100}'
+            ),
+        },
+        {
+            "func_name": "sync_sht_by_max_page",
+            "func_label": "Sync By Page Range",
+            "func_args_description": (
+                'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":5}'
+            ),
+        },
+        {
+            "func_name": "sync_crawl_issue_outputs",
+            "func_label": "Import Crawl Issue Outputs",
+            "func_args_description": (
+                "No extra args required. Scans output_path and imports txt/torrent/nfo results."
+            ),
+        },
+    ]
+    func_map = {
+        "sync_sht_by_tid": sync_sht_by_tid,
+        "sync_sht_by_max_page": sync_sht_by_max_page,
+        "sync_crawl_issue_outputs": sync_crawl_issue_outputs,
+    }
+    return task_functions, func_map
+
+
 def list_task_functions():
-    return TASK_FUNCTIONS
+    task_functions, _ = _load_task_registry()
+    return task_functions
+
+
+def get_func_map():
+    _, func_map = _load_task_registry()
+    return func_map
 
 
 def list_task():
@@ -99,9 +110,10 @@ def push_transfer_job():
 
 
 def push_job():
+    _, func_map = _load_task_registry()
     tasks = list_task()
     for task in tasks:
-        if task.task_func not in FUNC_MAP:
+        if task.task_func not in func_map:
             logger.warning(f"skip unsupported task function: {task.task_func}")
             continue
 
@@ -110,7 +122,7 @@ def push_job():
             if task.task_args:
                 kwargs = json.loads(task.task_args)
             scheduler.add_job(
-                FUNC_MAP[task.task_func],
+                func_map[task.task_func],
                 kwargs=kwargs,
                 trigger=CronTrigger.from_crontab(expr=task.task_cron),
             )

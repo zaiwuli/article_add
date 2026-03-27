@@ -4,7 +4,11 @@ import threading
 from sqlalchemy.orm import Session
 
 from app.models.task import Task
-from app.scheduler import FUNC_MAP, list_task_functions as get_task_functions, restart_scheduler
+from app.scheduler import (
+    get_func_map,
+    list_task_functions as get_task_functions,
+    restart_scheduler,
+)
 from app.schemas.response import error, success
 from app.schemas.task import TaskForm
 
@@ -19,7 +23,8 @@ def list_task_functions():
 
 
 def add_task(db: Session, task_form: TaskForm):
-    if task_form.task_func not in FUNC_MAP:
+    func_map = get_func_map()
+    if task_form.task_func not in func_map:
         return error("task function is not supported")
     if task_form.task_args:
         try:
@@ -35,7 +40,8 @@ def add_task(db: Session, task_form: TaskForm):
 
 
 def update_task(db: Session, task_form: TaskForm):
-    if task_form.task_func not in FUNC_MAP:
+    func_map = get_func_map()
+    if task_form.task_func not in func_map:
         return error("task function is not supported")
     if task_form.task_args:
         try:
@@ -65,10 +71,11 @@ def delete_task(db: Session, task_id):
 
 
 def run_task(db: Session, task_id: int):
+    func_map = get_func_map()
     task = db.get(Task, task_id)
     if not task:
         return error("task not found")
-    if task.task_func not in FUNC_MAP:
+    if task.task_func not in func_map:
         return error("task function is not supported")
 
     kwargs = {}
@@ -78,7 +85,7 @@ def run_task(db: Session, task_id: int):
         except json.JSONDecodeError:
             return error("task args must be valid json")
     threading.Thread(
-        target=FUNC_MAP[task.task_func],
+        target=func_map[task.task_func],
         kwargs=kwargs,
         daemon=True,
     ).start()

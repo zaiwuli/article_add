@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import type { ArticleFilter } from '@/types/article.ts'
+import type { ArticleFilter } from '@/types/article'
 import { Loader2 } from 'lucide-react'
-import { getArticles, getCategories } from '@/api/article.ts'
+import { getArticles, getCategories } from '@/api/article'
 import { useSearch } from '@/context/search-provider.tsx'
 import { useDebounce } from '@/hooks/use-debounce.tsx'
-import { ArticleCard } from '@/features/articles/components/article-card.tsx'
-import { FilterBar } from '@/features/articles/components/filter-bar.tsx'
+import { ArticleCard } from '@/features/articles/components/article-card'
+import { FilterBar } from '@/features/articles/components/filter-bar'
 
 const PAGE_SIZE = 10
 
@@ -17,7 +17,6 @@ export function ArticlesMobile() {
     keyword: '',
     category: '',
   })
-
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -38,7 +37,7 @@ export function ArticlesMobile() {
     },
     getNextPageParam: (lastPage, allPages) => {
       const currentTotal = allPages.reduce(
-        (acc, page) => acc + page.items.length,
+        (count, page) => count + page.items.length,
         0
       )
       return currentTotal < lastPage.total ? allPages.length + 1 : undefined
@@ -56,9 +55,10 @@ export function ArticlesMobile() {
     staleTime: 5 * 60 * 1000,
   })
 
-  // 无限滚动监听
   useEffect(() => {
-    if (!loadMoreRef.current) return
+    if (!loadMoreRef.current) {
+      return
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -71,13 +71,8 @@ export function ArticlesMobile() {
 
     observer.observe(loadMoreRef.current)
     return () => observer.disconnect()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
 
-  const handleFilterChange = (v: ArticleFilter) => {
-    setFilter(v)
-  }
-
-  // 合并所有页面数据
   const articles = data?.pages.flatMap((page) => page.items) || []
   const total = data?.pages[0]?.total || 0
 
@@ -86,7 +81,7 @@ export function ArticlesMobile() {
       <FilterBar
         value={filter}
         categories={categories || []}
-        onChange={handleFilterChange}
+        onChange={setFilter}
       />
 
       <div className='flex-1 overflow-y-auto'>
@@ -96,7 +91,6 @@ export function ArticlesMobile() {
           ))}
         </div>
 
-        {/* 加载更多触发器 */}
         <div ref={loadMoreRef} className='py-4 text-center'>
           {isFetchingNextPage && (
             <div className='flex items-center justify-center gap-2 text-muted-foreground'>
@@ -104,6 +98,7 @@ export function ArticlesMobile() {
               <span>加载中...</span>
             </div>
           )}
+
           {!hasNextPage && articles.length > 0 && (
             <div className='text-sm text-muted-foreground'>
               已加载全部 {total} 条数据
@@ -111,7 +106,6 @@ export function ArticlesMobile() {
           )}
         </div>
 
-        {/* 初始加载状态 */}
         {isLoading && (
           <div className='flex items-center justify-center py-8'>
             <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />

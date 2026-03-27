@@ -22,7 +22,7 @@ from app.models.config import Config
 from app.models.crawl_issue import CrawlIssue
 from app.models.task import Task
 from app.models.user import User
-from app.modules.sht import extract_edk, extract_magnet, sht
+from app.modules.sht import TEXT_ATTACHMENT_EXTENSIONS, extract_edk, extract_magnet, sht
 from app.scheduler.sht_section_registry import get_section_config
 from app.schemas.config import JsonPayload
 from app.schemas.response import error, success
@@ -81,9 +81,9 @@ def get_crawl_issue_handling_config(db: Session):
 def save_crawl_issue_handling_config(db: Session, payload: dict):
     data = _normalize_issue_handling_config(payload)
     if not data["watch_path"]:
-        return error("watch_path is required")
+        return error("监控目录不能为空")
     if not data["output_path"]:
-        return error("output_path is required")
+        return error("解压输出目录不能为空")
 
     result = save_option(
         JsonPayload(
@@ -424,7 +424,7 @@ def _build_article_from_issue(issue: CrawlIssue, magnet_values: list[str], edk_v
 def preview_url(url: str):
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
-        return error("invalid url")
+        return error("无效的链接地址")
 
     runtime = sht.get_runtime_config()
     mod = _extract_query_value(url, "mod")
@@ -465,26 +465,26 @@ def preview_url(url: str):
             payload["issue"] = _serialize_preview_issue(result)
         return success(payload)
 
-    return error("unsupported url, only forumdisplay and viewthread are supported")
+    return error("仅支持 forumdisplay 和 viewthread 链接")
 
 
 def save_url(url: str, db: Session, fid: str | None = None):
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.netloc:
-        return error("invalid url")
+        return error("无效的链接地址")
 
     mod = _extract_query_value(url, "mod")
     if mod == "forumdisplay" or _extract_query_value(url, "fid"):
         target_fid = fid or _extract_query_value(url, "fid")
         if not target_fid:
-            return error("fid is required for forumdisplay save")
+            return error("forumdisplay 链接必须提供 fid")
 
         section_config = get_section_config(target_fid)
         section = section_config["section"]
         website = _normalize_website(url, section_config.get("website"))
         tid_list = sht.crawler_tid_list(url)
         if not tid_list:
-            return error("failed to crawl target url")
+            return error("抓取目标链接失败")
 
         existing_tids = set(
             db.execute(
@@ -535,13 +535,13 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 "issue_saved": issue_saved,
                 "failed_ids": failed_ids,
             },
-            message="resources saved",
+            message="抓取结果已保存",
         )
 
     if mod == "viewthread" or _extract_query_value(url, "tid"):
         tid = _extract_query_value(url, "tid")
         if not tid:
-            return error("tid is required for viewthread save")
+            return error("viewthread 链接必须提供 tid")
 
         section_config = get_section_config(fid) if fid else None
         section = section_config["section"] if section_config else "manual"
@@ -571,10 +571,10 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 "issue_status": outcome.get("status"),
                 "issue_id": outcome.get("issue_id"),
             },
-            message="resource saved",
+            message="抓取结果已保存",
         )
 
-    return error("unsupported url, only forumdisplay and viewthread are supported")
+    return error("仅支持 forumdisplay 和 viewthread 链接")
 
 
 def list_crawl_issues(
@@ -627,7 +627,7 @@ def list_crawl_issues(
 def retry_crawl_issue(db: Session, issue_id: int):
     issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
     if not issue:
-        return error("crawl issue not found", code=404)
+        return error("未找到抓取问题记录", code=404)
 
     result = sht.inspect_detail(issue.detail_url)
     article_payload = build_article_payload(
@@ -647,7 +647,7 @@ def retry_crawl_issue(db: Session, issue_id: int):
                 "action": action,
                 "deleted_issue_id": issue_id,
             },
-            message="crawl issue resolved",
+            message="抓取问题已解决",
         )
 
     issue_payload = build_crawl_issue_payload(
@@ -663,34 +663,34 @@ def retry_crawl_issue(db: Session, issue_id: int):
         {
             "issue": _serialize_crawl_issue(updated_issue),
         },
-        message="crawl issue updated",
+        message="抓取问题已更新",
     )
 
 
 def ignore_crawl_issue(db: Session, issue_id: int):
     issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
     if not issue:
-        return error("crawl issue not found", code=404)
+        return error("未找到抓取问题记录", code=404)
     issue.status = ISSUE_STATUS_IGNORED
     db.flush()
     return success(
         {
             "issue": _serialize_crawl_issue(issue),
         },
-        message="crawl issue ignored",
+        message="抓取问题已忽略",
     )
 
 
 def download_crawl_issue(db: Session, issue_id: int):
     issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
     if not issue:
-        return error("crawl issue not found", code=404)
+        return error("未找到抓取问题记录", code=404)
 
     attachment_urls = normalize_string_list(issue.attachment_urls)
     attachment_names = normalize_string_list(issue.attachment_names)
     attachment_types = normalize_string_list(issue.attachment_types)
     if not attachment_urls:
-        return error("no attachment urls found for this issue")
+        return error("当前问题没有可下载的附件链接")
 
     config = load_crawl_issue_handling_config(db)
     watch_path = Path(config["watch_path"])
@@ -721,14 +721,14 @@ def download_crawl_issue(db: Session, issue_id: int):
 
     issue.status = ISSUE_STATUS_DOWNLOADED
     if issue.issue_type == ISSUE_TYPE_ARCHIVE:
-        issue.reason_message = f"downloaded {len(downloaded_files)} archive file(s)"
+        issue.reason_message = f"已下载 {len(downloaded_files)} 个压缩包附件，等待外部解压"
     db.flush()
     return success(
         {
             "downloaded_files": downloaded_files,
             "issue": _serialize_crawl_issue(issue),
         },
-        message="attachments downloaded",
+        message="附件已下载到监控目录",
     )
 
 
@@ -753,7 +753,7 @@ def import_crawl_issue_outputs(db: Session, issue_id: int | None = None):
             skipped.append(
                 {
                     "issue_id": issue.id,
-                    "reason": "output not found",
+                    "reason": "未找到解压输出",
                 }
             )
             continue
@@ -764,7 +764,7 @@ def import_crawl_issue_outputs(db: Session, issue_id: int | None = None):
             skipped.append(
                 {
                     "issue_id": issue.id,
-                    "reason": "no supported resources found in output",
+                    "reason": "解压输出中未发现可导入的资源",
                 }
             )
             continue
@@ -782,7 +782,7 @@ def import_crawl_issue_outputs(db: Session, issue_id: int | None = None):
             "deleted_issue_ids": deleted_issue_ids,
             "skipped": skipped,
         },
-        message="crawl issue outputs imported",
+        message="解压输出已扫描导入",
     )
 
 
@@ -794,7 +794,7 @@ def reset_resource_table(db: Session):
         {
             "deleted": count,
         },
-        message="resource table reset",
+        message="资源表已重置",
     )
 
 

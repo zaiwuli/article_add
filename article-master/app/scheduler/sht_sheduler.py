@@ -95,17 +95,17 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
             or 0
         )
 
-    logger.info(f"[{section}] latest saved tid: {stop_tid}")
+    logger.info(f"[{section}] 当前已保存的最新 tid: {stop_tid}")
     while page <= max_page:
         time.sleep(1)
-        logger.info(f"[{section}] fetch page {page}")
+        logger.info(f"[{section}] 开始抓取第 {page} 页")
         tid_list = _fetch_tid_list(fid, page)
         if not tid_list:
-            logger.info(f"[{section}] stop after retries on page {page}")
+            logger.info(f"[{section}] 第 {page} 页重试后仍失败，停止继续抓取")
             break
 
         min_tid = min(tid_list)
-        logger.info(f"[{section}] min tid on page {page}: {min_tid}")
+        logger.info(f"[{section}] 第 {page} 页最小 tid: {min_tid}")
         (
             articles_added,
             page_issue_payloads,
@@ -118,7 +118,7 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
         fail_id_list.extend(page_fail_ids)
 
         if min_tid <= stop_tid:
-            logger.info(f"[{section}] reached historical boundary")
+            logger.info(f"[{section}] 已触达历史边界，停止增量抓取")
             break
         page += 1
 
@@ -144,10 +144,10 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
 
     while page <= max_page:
         time.sleep(1)
-        logger.info(f"[{section}] fetch page {page}")
+        logger.info(f"[{section}] 开始抓取第 {page} 页")
         tid_list = _fetch_tid_list(fid, page)
         if not tid_list:
-            logger.info(f"[{section}] stop after retries on page {page}")
+            logger.info(f"[{section}] 第 {page} 页重试后仍失败，停止继续抓取")
             break
 
         (
@@ -178,7 +178,7 @@ def _fetch_tid_list(fid, page):
         )
         if tid_list:
             return tid_list
-        logger.warning(f"page {page} fetch failed, retry {retry + 1}/3")
+        logger.warning(f"第 {page} 页抓取失败，正在重试 {retry + 1}/3")
         time.sleep(10)
     return []
 
@@ -248,7 +248,7 @@ def _crawl_articles(section_config: Dict[str, str], tid_list, seen_tids=None):
                 fail_id_list.append(tid)
             time.sleep(1)
         except Exception as exc:
-            logger.error(f"[{section}] crawl tid={tid} failed: {exc}")
+            logger.error(f"[{section}] 抓取 tid={tid} 失败: {exc}")
             fail_id_list.append(tid)
 
     return articles, issue_payloads, resolved_pairs, fail_id_list
@@ -299,7 +299,7 @@ def _save_articles(articles):
     with session_scope() as session:
         pending_payloads = _filter_existing_payloads(session, payloads)
         if not pending_payloads:
-            logger.info("skip insert because all crawled articles already exist")
+            logger.info("本轮抓取结果均已存在，跳过写入")
             return 0
 
         if session.bind is not None and session.bind.dialect.name == "postgresql":
@@ -310,13 +310,13 @@ def _save_articles(articles):
             result = session.execute(stmt)
             inserted_count = result.rowcount if result.rowcount and result.rowcount > 0 else 0
             logger.info(
-                f"saved {inserted_count} articles, skipped {len(payloads) - inserted_count} duplicates"
+                f"资源写入完成: 新增 {inserted_count} 条，跳过重复 {len(payloads) - inserted_count} 条"
             )
             return inserted_count
 
         session.add_all([Article(payload) for payload in pending_payloads])
         logger.info(
-            f"saved {len(pending_payloads)} articles, skipped {len(payloads) - len(pending_payloads)} duplicates"
+            f"资源写入完成: 新增 {len(pending_payloads)} 条，跳过重复 {len(payloads) - len(pending_payloads)} 条"
         )
         return len(pending_payloads)
 
@@ -332,7 +332,7 @@ def save_fail_tid_to_file(fid, fail_id_list):
     file_path = os.path.join(base_dir, file_name)
     with open(file_path, "w", encoding="utf-8") as file:
         file.write(f"failed_ids={','.join(str(item) for item in fail_id_list)}\n")
-    logger.warning(f"saved failed tids to {file_path}")
+    logger.warning(f"失败 tid 已保存到: {file_path}")
 
 
 def save_result_to_file(message):
@@ -345,7 +345,7 @@ def save_result_to_file(message):
     file_path = os.path.join(base_dir, file_name)
     with open(file_path, "w", encoding="utf-8") as file:
         file.write(message)
-    logger.warning(f"saved crawl summary to {file_path}")
+    logger.warning(f"抓取摘要已保存到: {file_path}")
 
 
 def retry_fail_tid(fid, fail_id_list):
@@ -356,7 +356,7 @@ def retry_fail_tid(fid, fail_id_list):
     if not fail_id_list:
         return []
 
-    logger.info(f"[{section}] retry failed tids: {len(fail_id_list)}")
+    logger.info(f"[{section}] 开始重试失败 tid，数量: {len(fail_id_list)}")
     articles = []
     issue_payloads = []
     resolved_pairs = []
@@ -395,13 +395,13 @@ def retry_fail_tid(fid, fail_id_list):
                 fail_id_list.remove(tid)
             time.sleep(random.uniform(2, 3))
         except Exception as exc:
-            logger.exception(f"[{section}] retry tid={tid} failed again: {exc}")
+            logger.exception(f"[{section}] 重试 tid={tid} 再次失败: {exc}")
 
     _save_articles(articles)
     with session_scope() as session:
         crawler_service.save_crawl_issues(session, issue_payloads, increment_retry=True)
         crawler_service.clear_crawl_issues(session, resolved_pairs)
-    logger.info(f"[{section}] remaining failed tids: {fail_id_list}")
+    logger.info(f"[{section}] 仍然失败的 tid 列表: {fail_id_list}")
     return fail_id_list
 
 
@@ -410,7 +410,7 @@ def sync_crawl_issue_outputs():
         result = crawler_service.import_crawl_issue_outputs(session)
     data = result.get("data") or {}
     logger.info(
-        "crawl issue outputs synced: "
-        f"imported={data.get('imported', 0)} skipped={len(data.get('skipped', []))}"
+        "解压输出扫描完成: "
+        f"导入 {data.get('imported', 0)} 条，跳过 {len(data.get('skipped', []))} 条"
     )
     return data

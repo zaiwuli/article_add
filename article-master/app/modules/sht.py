@@ -97,7 +97,7 @@ def extract_exact_date(html_content):
     if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", processed_text):
         return processed_text.split(" ")[0]
 
-    logger.warning(f"unsupported date format: {date_text}")
+    logger.warning(f"未识别的日期格式: {date_text}")
     return None
 
 
@@ -197,7 +197,7 @@ class SHT:
                             payload.get("flare_solver_url") or ""
                         )
         except Exception as exc:
-            logger.warning(f"failed to load crawler runtime config: {exc}")
+            logger.warning(f"加载抓取运行配置失败: {exc}")
         return runtime_config
 
     def refresh_runtime_config(self):
@@ -219,18 +219,18 @@ class SHT:
         page_title = doc("head>title").text()
 
         if "Just a moment" in page_title:
-            logger.warning("cloudflare challenge detected")
+            logger.warning("检测到 Cloudflare 验证")
             html = self.bypass_cf(url)
             if not html:
-                logger.error("failed to bypass cloudflare")
+                logger.error("绕过 Cloudflare 验证失败")
                 return None
 
         doc = pq(html)
         if "var safeid" in doc.text():
-            logger.warning("safeid challenge detected")
+            logger.warning("检测到 safeid 验证")
             html = self.bypass_r18(html, url)
             if not html:
-                logger.error("failed to bypass safeid challenge")
+                logger.error("绕过 safeid 验证失败")
                 return None
 
         doc = pq(html)
@@ -238,12 +238,12 @@ class SHT:
             return html
 
         if page_title:
-            logger.warning(page_title)
+            logger.warning(f"页面标题异常: {page_title}")
         return None
 
     def bypass_cf(self, url):
         if not self.flare_solver:
-            logger.error("flare solver is not configured")
+            logger.error("未配置 FlareSolverR 地址")
             return None
 
         payload = {
@@ -315,7 +315,7 @@ class SHT:
                     id_list.append(int(tid))
             return id_list
         except Exception as exc:
-            logger.error(f"failed to crawl tid list {url}: {exc}")
+            logger.error(f"抓取帖子列表失败 {url}: {exc}")
             return []
 
     def collect_attachment_candidates(self, doc, refer):
@@ -385,7 +385,7 @@ class SHT:
                     "issue_type": "detail_fetch_failed",
                     "stage": "detail_fetch",
                     "reason_code": "detail_fetch_failed",
-                    "reason_message": "failed to load detail html",
+                    "reason_message": "详情页加载失败",
                     "attachments": [],
                     "title": None,
                     "category": None,
@@ -435,12 +435,9 @@ class SHT:
                             url, candidate["url"]
                         )
                     except Exception as exc:
-                        logger.warning(
-                            "failed to parse text attachment "
-                            f"{candidate['url']}: {exc}"
-                        )
+                        logger.warning(f"解析文本附件失败 {candidate['url']}: {exc}")
                         text_errors.append(
-                            f"{candidate['name']}: {str(exc).strip() or 'parse failed'}"
+                            f"{candidate['name']}：解析文本附件失败"
                         )
                         continue
 
@@ -480,13 +477,13 @@ class SHT:
                     "issue_type": "archive_detected",
                     "stage": "resource_parse",
                     "reason_code": "archive_detected",
-                    "reason_message": "archive attachments require external processing",
+                    "reason_message": "检测到压缩包附件，需要下载后在外部解压",
                     "attachments": archive_candidates,
                     "article": None,
                     **base_payload,
                 }
 
-            reason_message = "no supported download resource found"
+            reason_message = "未找到可直接入库的磁力、ED2K 或可解析附件"
             if text_errors:
                 reason_message = "; ".join(text_errors[:2])
 
@@ -502,14 +499,14 @@ class SHT:
                 **base_payload,
             }
         except Exception as exc:
-            logger.error(f"failed to crawl detail {url}: {exc}")
+            logger.error(f"抓取详情页失败 {url}: {exc}")
             return {
                 "ok": False,
                 "status": "failed",
                 "issue_type": "crawl_exception",
                 "stage": "detail_parse",
                 "reason_code": "crawl_detail_exception",
-                "reason_message": str(exc),
+                "reason_message": f"详情解析异常：{str(exc)}",
                 "attachments": [],
                 "title": None,
                 "category": None,
@@ -531,7 +528,7 @@ class SHT:
                 with open(torrent_source, "rb") as file:
                     torrent_bin = file.read()
                 if len(torrent_bin) == 0:
-                    logger.error("local torrent file is empty")
+                    logger.error("本地种子文件为空")
                     return None
             else:
                 headers = dict(self.headers)
@@ -549,7 +546,7 @@ class SHT:
                 torrent_bin = resp.content
                 if len(torrent_bin) < 100:
                     logger.error(
-                        f"torrent payload looks invalid: {len(torrent_bin)} bytes"
+                        f"种子附件内容异常，文件过小: {len(torrent_bin)} bytes"
                     )
                     return None
 
@@ -559,7 +556,7 @@ class SHT:
             elif "info" in torrent_dict:
                 info_dict = torrent_dict["info"]
             else:
-                logger.error("torrent file does not contain info node")
+                logger.error("种子文件缺少 info 节点")
                 return None
 
             info_bin = bencoder.encode(info_dict)
@@ -580,7 +577,7 @@ class SHT:
             encoded_name = urlencode({"dn": torrent_name})[3:]
             return f"magnet:?xt=urn:btih:{info_hash_hex}&dn={encoded_name}"
         except Exception as exc:
-            logger.error(f"failed to parse torrent: {exc}")
+            logger.error(f"解析种子文件失败: {exc}")
             return None
 
 
