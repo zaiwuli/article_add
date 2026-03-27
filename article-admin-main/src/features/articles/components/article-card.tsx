@@ -180,7 +180,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           )}
         </div>
 
-        <TooltipProvider>
+          <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <h6 className='line-clamp-2 cursor-default break-words text-base font-semibold leading-snug transition-colors group-hover:text-primary sm:text-sm'>
@@ -191,7 +191,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
               <p className='text-sm'>{article.title}</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
+          </TooltipProvider>
 
         <div className='mt-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
           <span className='rounded-full border px-2.5 py-1'>{article.website}</span>
@@ -211,6 +211,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
       </div>
 
       <div className='flex w-full gap-2 sm:w-auto sm:flex-col sm:justify-center'>
+        {magnet && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -229,6 +230,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        )}
 
         {edk && (
           <TooltipProvider>

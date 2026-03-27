@@ -87,6 +87,8 @@ def get_torrents(keyword, db: Session) -> Dict:
     torrents = []
     for article in articles:
         magnet_list = normalize_string_list(article.magnet)
+        if not magnet_list:
+            continue
         search_text = join_search_text(
             [article.title, article.section, article.category or ""]
         )

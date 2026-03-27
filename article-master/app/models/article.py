@@ -22,6 +22,13 @@ class Article(Base):
     magnet: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
     edk: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
     preview_images: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
+    archive_attachment_urls: list[str] = Column(
+        ARRAY(Text), nullable=False, server_default="{}"
+    )
+    archive_attachment_names: list[str] = Column(
+        ARRAY(Text), nullable=False, server_default="{}"
+    )
+    archive_parse_status: str = Column(Text, nullable=False, server_default="none")
     detail_url: str = Column(Text)
     size: int = Column(Integer())
     section: str = Column(Text, nullable=False)

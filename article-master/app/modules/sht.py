@@ -3,7 +3,7 @@ import hashlib
 import json
 import re
 from datetime import datetime, timedelta
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import bencoder
 from curl_cffi import requests
@@ -15,6 +15,17 @@ from app.models import Config
 from app.utils.log import logger
 
 CRAWLER_RUNTIME_CONFIG_KEY = "CrawlerRuntime"
+MAGNET_PATTERN = re.compile(
+    r"magnet:\?xt=urn:btih:[0-9a-fA-F]+(?:[^\s]*)?",
+    re.IGNORECASE,
+)
+ATTACHMENT_NAME_PATTERN = re.compile(
+    r'([^"\'<>]+?\.(torrent|txt|nfo|zip|rar|7z))',
+    re.IGNORECASE,
+)
+TEXT_ATTACHMENT_EXTENSIONS = {"txt", "nfo"}
+ARCHIVE_ATTACHMENT_EXTENSIONS = {"zip", "rar", "7z"}
+TEXT_ATTACHMENT_MAX_BYTES = 1024 * 1024
 
 
 def get_default_runtime_config():
@@ -104,6 +115,24 @@ def extract_edk(text):
     if match:
         return match.group()
     return None
+
+
+def extract_magnet(text):
+    match = MAGNET_PATTERN.search(text or "")
+    if match:
+        return match.group()
+    return None
+
+
+def extract_attachment_name(*values):
+    for value in values:
+        if not value:
+            continue
+        match = ATTACHMENT_NAME_PATTERN.search(str(value))
+        if match:
+            name = re.sub(r"\s+", " ", match.group(1)).strip()
+            return name, match.group(2).lower()
+    return None, None
 
 
 class SHT:
@@ -276,6 +305,68 @@ class SHT:
             logger.error(f"failed to crawl tid list {url}: {exc}")
             return []
 
+    def collect_attachment_candidates(self, doc, refer):
+        candidates = []
+        seen = set()
+        for item in doc("a").items():
+            href = (item.attr("href") or "").strip()
+            if not href or href.startswith("#") or href.lower().startswith("javascript:"):
+                continue
+
+            name, ext = extract_attachment_name(
+                item.text(),
+                item.attr("title"),
+                item.attr("download"),
+                href,
+            )
+            if not ext:
+                continue
+
+            attachment_url = urljoin(refer, href)
+            key = (attachment_url, ext)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            candidates.append(
+                {
+                    "name": name or attachment_url,
+                    "url": attachment_url,
+                    "ext": ext,
+                }
+            )
+        return candidates
+
+    def download_attachment_bytes(self, refer, source):
+        headers = dict(self.headers)
+        headers["Referer"] = refer
+        resp = requests.get(
+            source,
+            proxies=self.proxies,
+            cookies=self.cookie,
+            headers=headers,
+            allow_redirects=True,
+            timeout=10,
+            impersonate="chrome110",
+        )
+        resp.raise_for_status()
+        return resp.content
+
+    def parse_text_attachment(self, refer, source):
+        payload = self.download_attachment_bytes(refer, source)
+        if len(payload) > TEXT_ATTACHMENT_MAX_BYTES:
+            raise ValueError(
+                f"text attachment exceeds limit: {len(payload)} bytes"
+            )
+
+        for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5"):
+            try:
+                return payload.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+
+        return payload.decode("utf-8", errors="ignore")
+
     def crawler_detail(self, url):
         try:
             html = self.get_original(url)
@@ -284,20 +375,51 @@ class SHT:
 
             doc = pq(html)
             all_text = doc("div.blockcode").text()
-            magnet_pattern = r"magnet:\?xt=urn:btih:[0-9a-fA-F]+(?:[^\s]*)?"
-            match = re.search(magnet_pattern, all_text)
-            magnet = match.group() if match else None
-            if not magnet:
-                torrent = doc("a:contains('.torrent')").eq(0)
-                if torrent:
-                    torrent_url = torrent.attr("href")
-                    if torrent_url:
-                        magnet = self.parse_torrent_get_magnet(
-                            url,
-                            f"https://sehuatang.org/{torrent_url}",
+            magnet = extract_magnet(all_text)
+            edk = extract_edk(all_text)
+            attachment_candidates = self.collect_attachment_candidates(doc, url)
+            text_candidates = [
+                item
+                for item in attachment_candidates
+                if item["ext"] in TEXT_ATTACHMENT_EXTENSIONS
+            ]
+            archive_candidates = [
+                item
+                for item in attachment_candidates
+                if item["ext"] in ARCHIVE_ATTACHMENT_EXTENSIONS
+            ]
+
+            if (not magnet or not edk) and text_candidates:
+                for candidate in text_candidates:
+                    try:
+                        attachment_text = self.parse_text_attachment(
+                            url, candidate["url"]
                         )
+                    except Exception as exc:
+                        logger.warning(
+                            "failed to parse text attachment "
+                            f"{candidate['url']}: {exc}"
+                        )
+                        continue
+
+                    if not magnet:
+                        magnet = extract_magnet(attachment_text)
+                    if not edk:
+                        edk = extract_edk(attachment_text)
+                    if magnet and edk:
+                        break
 
             if not magnet:
+                for candidate in attachment_candidates:
+                    if candidate["ext"] == "torrent":
+                        magnet = self.parse_torrent_get_magnet(
+                            url,
+                            candidate["url"],
+                        )
+                        if magnet:
+                            break
+
+            if not magnet and not edk and not archive_candidates:
                 return {}
 
             title = doc("h2.n5_bbsnrbt").text()
@@ -308,16 +430,21 @@ class SHT:
                 if src:
                     img_src_list.append(src.strip())
 
-            edk = extract_edk(all_text)
-
             return {
                 "title": title,
                 "category": extract_bracket_content(html),
                 "publish_date": extract_exact_date(html),
-                "magnet": [magnet],
+                "magnet": [magnet] if magnet else [],
                 "preview_images": img_src_list,
                 "size": extract_and_convert_video_size(html),
                 "edk": [edk] if edk else [],
+                "archive_attachment_urls": [
+                    candidate["url"] for candidate in archive_candidates
+                ],
+                "archive_attachment_names": [
+                    candidate["name"] for candidate in archive_candidates
+                ],
+                "archive_parse_status": "pending" if archive_candidates else "none",
             }
         except Exception as exc:
             logger.error(f"failed to crawl detail {url}: {exc}")
