@@ -59,14 +59,12 @@ def _normalize_article_schema(connection):
                 magnet_type text;
                 edk_type text;
                 preview_type text;
-                archive_urls_type text;
-                archive_names_type text;
             BEGIN
                 EXECUTE $sql$
                     ALTER TABLE sht.article
-                    ADD COLUMN IF NOT EXISTS archive_attachment_urls text[],
-                    ADD COLUMN IF NOT EXISTS archive_attachment_names text[],
-                    ADD COLUMN IF NOT EXISTS archive_parse_status text
+                    DROP COLUMN IF EXISTS archive_attachment_urls,
+                    DROP COLUMN IF EXISTS archive_attachment_names,
+                    DROP COLUMN IF EXISTS archive_parse_status
                 $sql$;
 
                 SELECT data_type INTO magnet_type
@@ -86,18 +84,6 @@ def _normalize_article_schema(connection):
                 WHERE table_schema = 'sht'
                   AND table_name = 'article'
                   AND column_name = 'preview_images';
-
-                SELECT data_type INTO archive_urls_type
-                FROM information_schema.columns
-                WHERE table_schema = 'sht'
-                  AND table_name = 'article'
-                  AND column_name = 'archive_attachment_urls';
-
-                SELECT data_type INTO archive_names_type
-                FROM information_schema.columns
-                WHERE table_schema = 'sht'
-                  AND table_name = 'article'
-                  AND column_name = 'archive_attachment_names';
 
                 IF magnet_type IS NOT NULL AND magnet_type <> 'ARRAY' THEN
                     EXECUTE $sql$
@@ -135,46 +121,11 @@ def _normalize_article_schema(connection):
                     $sql$;
                 END IF;
 
-                IF archive_urls_type IS NOT NULL AND archive_urls_type <> 'ARRAY' THEN
-                    EXECUTE $sql$
-                        ALTER TABLE sht.article
-                        ALTER COLUMN archive_attachment_urls TYPE text[]
-                        USING CASE
-                            WHEN archive_attachment_urls IS NULL OR btrim(archive_attachment_urls) = '' THEN ARRAY[]::text[]
-                            WHEN left(archive_attachment_urls, 1) = '{' AND right(archive_attachment_urls, 1) = '}' THEN archive_attachment_urls::text[]
-                            ELSE array_remove(string_to_array(archive_attachment_urls, ','), '')
-                        END
-                    $sql$;
-                END IF;
-
-                IF archive_names_type IS NOT NULL AND archive_names_type <> 'ARRAY' THEN
-                    EXECUTE $sql$
-                        ALTER TABLE sht.article
-                        ALTER COLUMN archive_attachment_names TYPE text[]
-                        USING CASE
-                            WHEN archive_attachment_names IS NULL OR btrim(archive_attachment_names) = '' THEN ARRAY[]::text[]
-                            WHEN left(archive_attachment_names, 1) = '{' AND right(archive_attachment_names, 1) = '}' THEN archive_attachment_names::text[]
-                            ELSE array_remove(string_to_array(archive_attachment_names, ','), '')
-                        END
-                    $sql$;
-                END IF;
-
-                EXECUTE $sql$
-                    UPDATE sht.article
-                    SET archive_attachment_urls = COALESCE(archive_attachment_urls, ARRAY[]::text[]),
-                        archive_attachment_names = COALESCE(archive_attachment_names, ARRAY[]::text[]),
-                        archive_parse_status = COALESCE(NULLIF(btrim(archive_parse_status), ''), 'none')
-                $sql$;
-
                 EXECUTE $sql$
                     ALTER TABLE sht.article
                     ALTER COLUMN magnet SET DEFAULT ARRAY[]::text[],
                     ALTER COLUMN edk SET DEFAULT ARRAY[]::text[],
-                    ALTER COLUMN preview_images SET DEFAULT ARRAY[]::text[],
-                    ALTER COLUMN archive_attachment_urls SET DEFAULT ARRAY[]::text[],
-                    ALTER COLUMN archive_attachment_names SET DEFAULT ARRAY[]::text[],
-                    ALTER COLUMN archive_parse_status SET DEFAULT 'none',
-                    ALTER COLUMN archive_parse_status SET NOT NULL
+                    ALTER COLUMN preview_images SET DEFAULT ARRAY[]::text[]
                 $sql$;
             END $$;
             """

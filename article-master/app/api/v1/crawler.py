@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -19,6 +19,61 @@ def preview_crawler_url(
     user: User = Depends(get_current_user),
 ):
     return crawler_service.preview_url(payload.url)
+
+
+@router.get("/issues")
+def list_crawl_issues(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    status: str | None = Query(default=None),
+    issue_type: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.list_crawl_issues(
+        db,
+        page=page,
+        per_page=per_page,
+        status=status,
+        issue_type=issue_type,
+        keyword=keyword,
+    )
+
+
+@router.post("/issues/import-outputs")
+def import_crawl_issue_outputs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.import_crawl_issue_outputs(db)
+
+
+@router.post("/issues/{issue_id}/retry")
+def retry_crawl_issue(
+    issue_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.retry_crawl_issue(db, issue_id)
+
+
+@router.post("/issues/{issue_id}/download")
+def download_crawl_issue(
+    issue_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.download_crawl_issue(db, issue_id)
+
+
+@router.post("/issues/{issue_id}/ignore")
+def ignore_crawl_issue(
+    issue_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.ignore_crawl_issue(db, issue_id)
 
 
 @router.post("/save")

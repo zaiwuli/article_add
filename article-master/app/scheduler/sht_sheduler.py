@@ -7,6 +7,7 @@ from typing import Dict, Iterable, Optional, Tuple
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.api.services import crawler_service
 from app.core.config import data_path
 from app.core.database import session_scope
 from app.models.article import Article
@@ -20,9 +21,6 @@ ARTICLE_INSERT_FIELDS = (
     "publish_date",
     "magnet",
     "preview_images",
-    "archive_attachment_urls",
-    "archive_attachment_names",
-    "archive_parse_status",
     "detail_url",
     "size",
     "section",
@@ -85,6 +83,8 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
     page = int(start_page)
     max_page = int(max_page)
     articles = []
+    issue_payloads = []
+    resolved_pairs = []
     seen_tids = set()
 
     with session_scope() as session:
@@ -106,8 +106,15 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
 
         min_tid = min(tid_list)
         logger.info(f"[{section}] min tid on page {page}: {min_tid}")
-        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list, seen_tids)
+        (
+            articles_added,
+            page_issue_payloads,
+            page_resolved_pairs,
+            page_fail_ids,
+        ) = _crawl_articles(section_config, tid_list, seen_tids)
         articles.extend(articles_added)
+        issue_payloads.extend(page_issue_payloads)
+        resolved_pairs.extend(page_resolved_pairs)
         fail_id_list.extend(page_fail_ids)
 
         if min_tid <= stop_tid:
@@ -116,6 +123,9 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
         page += 1
 
     inserted_count = _save_articles(articles)
+    with session_scope() as session:
+        crawler_service.save_crawl_issues(session, issue_payloads)
+        crawler_service.clear_crawl_issues(session, resolved_pairs)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
     return inserted_count, page, len(retry_fail_id_list)
@@ -128,6 +138,8 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
     max_page = int(max_page)
     fail_id_list = []
     articles = []
+    issue_payloads = []
+    resolved_pairs = []
     seen_tids = set()
 
     while page <= max_page:
@@ -138,12 +150,22 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
             logger.info(f"[{section}] stop after retries on page {page}")
             break
 
-        articles_added, page_fail_ids = _crawl_articles(section_config, tid_list, seen_tids)
+        (
+            articles_added,
+            page_issue_payloads,
+            page_resolved_pairs,
+            page_fail_ids,
+        ) = _crawl_articles(section_config, tid_list, seen_tids)
         articles.extend(articles_added)
+        issue_payloads.extend(page_issue_payloads)
+        resolved_pairs.extend(page_resolved_pairs)
         fail_id_list.extend(page_fail_ids)
         page += 1
 
     inserted_count = _save_articles(articles)
+    with session_scope() as session:
+        crawler_service.save_crawl_issues(session, issue_payloads)
+        crawler_service.clear_crawl_issues(session, resolved_pairs)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
     return inserted_count, page, len(retry_fail_id_list)
@@ -162,9 +184,12 @@ def _fetch_tid_list(fid, page):
 
 
 def _crawl_articles(section_config: Dict[str, str], tid_list, seen_tids=None):
+    fid = str(section_config.get("fid") or "")
     website = section_config["website"]
     section = section_config["section"]
     articles = []
+    issue_payloads = []
+    resolved_pairs = []
     fail_id_list = []
     seen_tids = seen_tids if seen_tids is not None else set()
 
@@ -182,7 +207,10 @@ def _crawl_articles(section_config: Dict[str, str], tid_list, seen_tids=None):
         )
 
     for tid in unique_tid_list:
-        if tid in existing_article_tids or tid in seen_tids:
+        if tid in existing_article_tids:
+            resolved_pairs.append((website, tid))
+            continue
+        if tid in seen_tids:
             continue
 
         detail_url = (
@@ -191,27 +219,39 @@ def _crawl_articles(section_config: Dict[str, str], tid_list, seen_tids=None):
         )
 
         try:
-            data = sht.crawler_detail(detail_url)
-            if not data:
-                fail_id_list.append(tid)
+            result = sht.inspect_detail(detail_url)
+            article_payload = crawler_service.build_article_payload(
+                result,
+                tid=tid,
+                fid=fid,
+                section=section,
+                website=website,
+                detail_url=detail_url,
+            )
+            if article_payload:
+                articles.append(Article(article_payload))
+                resolved_pairs.append((website, tid))
+                seen_tids.add(tid)
+                time.sleep(1)
                 continue
 
-            data.update(
-                {
-                    "tid": tid,
-                    "section": section,
-                    "website": website,
-                    "detail_url": detail_url,
-                }
+            issue_payload = crawler_service.build_crawl_issue_payload(
+                result,
+                tid=tid,
+                fid=fid,
+                section=section,
+                website=website,
+                detail_url=detail_url,
             )
-            articles.append(Article(data))
-            seen_tids.add(tid)
+            issue_payloads.append(issue_payload)
+            if issue_payload["status"] == crawler_service.ISSUE_STATUS_FAILED:
+                fail_id_list.append(tid)
             time.sleep(1)
         except Exception as exc:
             logger.error(f"[{section}] crawl tid={tid} failed: {exc}")
             fail_id_list.append(tid)
 
-    return articles, fail_id_list
+    return articles, issue_payloads, resolved_pairs, fail_id_list
 
 
 def _article_to_payload(article: Article):
@@ -311,35 +351,66 @@ def save_result_to_file(message):
 def retry_fail_tid(fid, fail_id_list):
     section_config = get_section_config(fid)
     section = section_config["section"]
+    website = section_config["website"]
     fail_id_list = list(dict.fromkeys(fail_id_list))
     if not fail_id_list:
         return []
 
     logger.info(f"[{section}] retry failed tids: {len(fail_id_list)}")
     articles = []
+    issue_payloads = []
+    resolved_pairs = []
     for tid in fail_id_list[:]:
         detail_url = (
             "https://sehuatang.org/forum.php?"
             f"mod=viewthread&tid={tid}&extra=page%3D1&mobile=2"
         )
         try:
-            data = sht.crawler_detail(detail_url)
-            if not data:
-                continue
-            data.update(
-                {
-                    "tid": tid,
-                    "section": section_config["section"],
-                    "website": section_config["website"],
-                    "detail_url": detail_url,
-                }
+            result = sht.inspect_detail(detail_url)
+            article_payload = crawler_service.build_article_payload(
+                result,
+                tid=tid,
+                fid=str(fid),
+                section=section,
+                website=website,
+                detail_url=detail_url,
             )
-            articles.append(Article(data))
-            fail_id_list.remove(tid)
+            if article_payload:
+                articles.append(Article(article_payload))
+                resolved_pairs.append((website, tid))
+                fail_id_list.remove(tid)
+                time.sleep(random.uniform(2, 3))
+                continue
+
+            issue_payload = crawler_service.build_crawl_issue_payload(
+                result,
+                tid=tid,
+                fid=str(fid),
+                section=section,
+                website=website,
+                detail_url=detail_url,
+            )
+            issue_payloads.append(issue_payload)
+            if issue_payload["status"] != crawler_service.ISSUE_STATUS_FAILED:
+                fail_id_list.remove(tid)
             time.sleep(random.uniform(2, 3))
         except Exception as exc:
             logger.exception(f"[{section}] retry tid={tid} failed again: {exc}")
 
     _save_articles(articles)
+    with session_scope() as session:
+        crawler_service.save_crawl_issues(session, issue_payloads, increment_retry=True)
+        crawler_service.clear_crawl_issues(session, resolved_pairs)
     logger.info(f"[{section}] remaining failed tids: {fail_id_list}")
     return fail_id_list
+
+
+def sync_crawl_issue_outputs():
+    with session_scope() as session:
+        result = crawler_service.import_crawl_issue_outputs(session)
+    data = result.get("data") or {}
+    logger.info(
+        "crawl issue outputs synced: "
+        f"imported={data.get('imported', 0)} skipped={len(data.get('skipped', []))}"
+    )
+    return data

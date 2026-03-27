@@ -1,8 +1,10 @@
 import json
+import os
 
 from sqlalchemy.orm import Session
 
 from app.core import settings
+from app.core.config import data_path
 from app.models import Config
 from app.scheduler import list_task_functions
 from app.scheduler.sht_section_registry import list_section_configs
@@ -13,6 +15,7 @@ CRAWLER_SECTION_CONFIG_KEY = "CrawlerSections"
 CRAWLER_RUNTIME_CONFIG_KEY = "CrawlerRuntime"
 PUBLIC_ARTICLE_API_CONFIG_KEY = "PublicArticleApi"
 ARTICLE_TRANSFER_TARGET_CONFIG_KEY = "ArticleTransferTarget"
+CRAWLER_ISSUE_HANDLING_CONFIG_KEY = "CrawlerIssueHandling"
 
 
 def get_default_public_article_api_config():
@@ -32,6 +35,13 @@ def get_default_transfer_target_config():
         "table": "",
         "schedule_enabled": False,
         "schedule_cron": "0 2 * * *",
+    }
+
+
+def get_default_crawler_issue_handling_config():
+    return {
+        "watch_path": os.path.join(data_path, "crawl_watch"),
+        "output_path": os.path.join(data_path, "crawl_output"),
     }
 
 
@@ -106,6 +116,14 @@ def get_option(key, db: Session):
             data.update(payload)
             return success(data)
         return success(get_default_transfer_target_config())
+
+    if key == CRAWLER_ISSUE_HANDLING_CONFIG_KEY:
+        payload = load_config_payload(key, db)
+        if isinstance(payload, dict):
+            data = get_default_crawler_issue_handling_config()
+            data.update(payload)
+            return success(data)
+        return success(get_default_crawler_issue_handling_config())
 
     config = _load_config_record(key, db)
     if config:

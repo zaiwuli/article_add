@@ -135,6 +135,19 @@ def extract_attachment_name(*values):
     return None, None
 
 
+def decode_text_payload(payload):
+    if len(payload) > TEXT_ATTACHMENT_MAX_BYTES:
+        raise ValueError(f"text attachment exceeds limit: {len(payload)} bytes")
+
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5"):
+        try:
+            return payload.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return payload.decode("utf-8", errors="ignore")
+
+
 class SHT:
     proxy: str = None
     proxies = {}
@@ -338,6 +351,7 @@ class SHT:
         return candidates
 
     def download_attachment_bytes(self, refer, source):
+        self.refresh_runtime_config()
         headers = dict(self.headers)
         headers["Referer"] = refer
         resp = requests.get(
@@ -354,26 +368,50 @@ class SHT:
 
     def parse_text_attachment(self, refer, source):
         payload = self.download_attachment_bytes(refer, source)
-        if len(payload) > TEXT_ATTACHMENT_MAX_BYTES:
-            raise ValueError(
-                f"text attachment exceeds limit: {len(payload)} bytes"
-            )
+        return decode_text_payload(payload)
 
-        for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5"):
-            try:
-                return payload.decode(encoding)
-            except UnicodeDecodeError:
-                continue
+    def parse_text_file(self, source):
+        with open(source, "rb") as file:
+            payload = file.read()
+        return decode_text_payload(payload)
 
-        return payload.decode("utf-8", errors="ignore")
-
-    def crawler_detail(self, url):
+    def inspect_detail(self, url):
         try:
             html = self.get_original(url)
             if not html:
-                return {}
+                return {
+                    "ok": False,
+                    "status": "failed",
+                    "issue_type": "detail_fetch_failed",
+                    "stage": "detail_fetch",
+                    "reason_code": "detail_fetch_failed",
+                    "reason_message": "failed to load detail html",
+                    "attachments": [],
+                    "title": None,
+                    "category": None,
+                    "publish_date": None,
+                    "preview_images": [],
+                    "size": None,
+                    "article": None,
+                }
 
             doc = pq(html)
+            title = doc("h2.n5_bbsnrbt").text()
+            title = re.sub(r"^\[.*?\]", "", title).strip()
+            img_src_list = []
+            for img in doc("div.message img").items():
+                src = img.attr("src")
+                if src:
+                    img_src_list.append(src.strip())
+
+            base_payload = {
+                "title": title,
+                "category": extract_bracket_content(html),
+                "publish_date": extract_exact_date(html),
+                "preview_images": img_src_list,
+                "size": extract_and_convert_video_size(html),
+            }
+
             all_text = doc("div.blockcode").text()
             magnet = extract_magnet(all_text)
             edk = extract_edk(all_text)
@@ -388,6 +426,7 @@ class SHT:
                 for item in attachment_candidates
                 if item["ext"] in ARCHIVE_ATTACHMENT_EXTENSIONS
             ]
+            text_errors = []
 
             if (not magnet or not edk) and text_candidates:
                 for candidate in text_candidates:
@@ -399,6 +438,9 @@ class SHT:
                         logger.warning(
                             "failed to parse text attachment "
                             f"{candidate['url']}: {exc}"
+                        )
+                        text_errors.append(
+                            f"{candidate['name']}: {str(exc).strip() or 'parse failed'}"
                         )
                         continue
 
@@ -419,36 +461,69 @@ class SHT:
                         if magnet:
                             break
 
-            if not magnet and not edk and not archive_candidates:
-                return {}
+            if magnet or edk:
+                return {
+                    "ok": True,
+                    "article": {
+                        **base_payload,
+                        "magnet": [magnet] if magnet else [],
+                        "edk": [edk] if edk else [],
+                    },
+                    "attachments": attachment_candidates,
+                    **base_payload,
+                }
 
-            title = doc("h2.n5_bbsnrbt").text()
-            title = re.sub(r"^\[.*?\]", "", title).strip()
-            img_src_list = []
-            for img in doc("div.message img").items():
-                src = img.attr("src")
-                if src:
-                    img_src_list.append(src.strip())
+            if archive_candidates:
+                return {
+                    "ok": False,
+                    "status": "pending_manual",
+                    "issue_type": "archive_detected",
+                    "stage": "resource_parse",
+                    "reason_code": "archive_detected",
+                    "reason_message": "archive attachments require external processing",
+                    "attachments": archive_candidates,
+                    "article": None,
+                    **base_payload,
+                }
+
+            reason_message = "no supported download resource found"
+            if text_errors:
+                reason_message = "; ".join(text_errors[:2])
 
             return {
-                "title": title,
-                "category": extract_bracket_content(html),
-                "publish_date": extract_exact_date(html),
-                "magnet": [magnet] if magnet else [],
-                "preview_images": img_src_list,
-                "size": extract_and_convert_video_size(html),
-                "edk": [edk] if edk else [],
-                "archive_attachment_urls": [
-                    candidate["url"] for candidate in archive_candidates
-                ],
-                "archive_attachment_names": [
-                    candidate["name"] for candidate in archive_candidates
-                ],
-                "archive_parse_status": "pending" if archive_candidates else "none",
+                "ok": False,
+                "status": "failed",
+                "issue_type": "resource_missing",
+                "stage": "resource_parse",
+                "reason_code": "download_resource_missing",
+                "reason_message": reason_message,
+                "attachments": attachment_candidates,
+                "article": None,
+                **base_payload,
             }
         except Exception as exc:
             logger.error(f"failed to crawl detail {url}: {exc}")
-            return {}
+            return {
+                "ok": False,
+                "status": "failed",
+                "issue_type": "crawl_exception",
+                "stage": "detail_parse",
+                "reason_code": "crawl_detail_exception",
+                "reason_message": str(exc),
+                "attachments": [],
+                "title": None,
+                "category": None,
+                "publish_date": None,
+                "preview_images": [],
+                "size": None,
+                "article": None,
+            }
+
+    def crawler_detail(self, url):
+        result = self.inspect_detail(url)
+        if result.get("ok") and result.get("article"):
+            return dict(result["article"])
+        return {}
 
     def parse_torrent_get_magnet(self, refer, torrent_source, is_local=False):
         try:

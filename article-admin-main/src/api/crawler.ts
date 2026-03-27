@@ -1,5 +1,6 @@
 import { request } from './request'
 import type {
+  CrawlerIssueListResult,
   CrawlerPreviewResult,
   CrawlerSaveResult,
 } from '@/types/config.ts'
@@ -17,6 +18,60 @@ export function saveCrawlerUrl(payload: { url: string; fid?: string }) {
     url: '/crawler/save',
     method: 'post',
     data: payload,
+  })
+}
+
+export function getCrawlerIssues(params: {
+  page: number
+  perPage: number
+  status?: string
+  issueType?: string
+  keyword?: string
+}) {
+  return request<CrawlerIssueListResult>({
+    url: '/crawler/issues',
+    method: 'get',
+    params: {
+      page: params.page,
+      per_page: params.perPage,
+      status: params.status,
+      issue_type: params.issueType,
+      keyword: params.keyword,
+    },
+  })
+}
+
+export function retryCrawlerIssue(issueId: number) {
+  return request<{ action?: string; deleted_issue_id?: number }>({
+    url: `/crawler/issues/${issueId}/retry`,
+    method: 'post',
+  })
+}
+
+export function downloadCrawlerIssue(issueId: number) {
+  return request<{
+    downloaded_files: string[]
+  }>({
+    url: `/crawler/issues/${issueId}/download`,
+    method: 'post',
+  })
+}
+
+export function ignoreCrawlerIssue(issueId: number) {
+  return request({
+    url: `/crawler/issues/${issueId}/ignore`,
+    method: 'post',
+  })
+}
+
+export function importCrawlerIssueOutputs() {
+  return request<{
+    imported: number
+    deleted_issue_ids: number[]
+    skipped: Array<{ issue_id: number; reason: string }>
+  }>({
+    url: '/crawler/issues/import-outputs',
+    method: 'post',
   })
 }
 

@@ -5,7 +5,11 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.core.database import session_scope
 from app.models.task import Task
-from app.scheduler.sht_sheduler import sync_sht_by_max_page, sync_sht_by_tid
+from app.scheduler.sht_sheduler import (
+    sync_crawl_issue_outputs,
+    sync_sht_by_max_page,
+    sync_sht_by_tid,
+)
 from app.utils.log import logger, transfer_logger
 
 scheduler = AsyncIOScheduler()
@@ -13,23 +17,29 @@ scheduler = AsyncIOScheduler()
 TASK_FUNCTIONS = [
     {
         "func_name": "sync_sht_by_tid",
-        "func_label": "按最新帖子增量抓取",
+        "func_label": "Sync Latest Threads",
         "func_args_description": (
-            '图形化参数会自动生成 JSON，例如 {"fids":["2","36","160"],"start_page":1,"max_page":100}'
+            'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":100}'
         ),
     },
     {
         "func_name": "sync_sht_by_max_page",
-        "func_label": "按页数批量抓取",
+        "func_label": "Sync By Page Range",
         "func_args_description": (
-            '图形化参数会自动生成 JSON，例如 {"fids":["2","36","160"],"start_page":1,"max_page":5}'
+            'Example JSON: {"fids":["2","36","160"],"start_page":1,"max_page":5}'
         ),
+    },
+    {
+        "func_name": "sync_crawl_issue_outputs",
+        "func_label": "Import Crawl Issue Outputs",
+        "func_args_description": "No extra args required. Scans output_path and imports txt/torrent/nfo results.",
     },
 ]
 
 FUNC_MAP = {
     "sync_sht_by_tid": sync_sht_by_tid,
     "sync_sht_by_max_page": sync_sht_by_max_page,
+    "sync_crawl_issue_outputs": sync_crawl_issue_outputs,
 }
 
 TRANSFER_JOB_ID = "article_transfer_schedule"

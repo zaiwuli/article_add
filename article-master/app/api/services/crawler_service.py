@@ -1,12 +1,17 @@
+import re
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from sqlalchemy import (
-    func,
-    select,
-    text,
-)
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
+from app.api.services.article_service import normalize_string_list
+from app.api.services.config_service import (
+    CRAWLER_ISSUE_HANDLING_CONFIG_KEY,
+    get_default_crawler_issue_handling_config,
+    load_config_payload,
+    save_option,
+)
 from app.api.services.user_service import (
     DEFAULT_ADMIN_PASSWORD,
     DEFAULT_ADMIN_USERNAME,
@@ -14,11 +19,22 @@ from app.api.services.user_service import (
 from app.core.security import get_password_hash
 from app.models.article import Article
 from app.models.config import Config
+from app.models.crawl_issue import CrawlIssue
 from app.models.task import Task
 from app.models.user import User
-from app.modules.sht import sht
+from app.modules.sht import extract_edk, extract_magnet, sht
 from app.scheduler.sht_section_registry import get_section_config
+from app.schemas.config import JsonPayload
 from app.schemas.response import error, success
+
+ISSUE_STATUS_FAILED = "failed"
+ISSUE_STATUS_PENDING_MANUAL = "pending_manual"
+ISSUE_STATUS_DOWNLOADED = "downloaded"
+ISSUE_STATUS_IGNORED = "ignored"
+
+ISSUE_TYPE_ARCHIVE = "archive_detected"
+OUTPUT_SCAN_EXTENSIONS = {".torrent", ".txt", ".nfo"}
+SAFE_FILENAME_PATTERN = re.compile(r"[^0-9A-Za-z._-]+")
 
 
 def _extract_query_value(url: str, key: str):
@@ -42,6 +58,89 @@ def _normalize_website(url: str, fallback: str | None = None):
     return (fallback or parsed.netloc or "sehuatang").strip()
 
 
+def _normalize_issue_handling_config(payload: dict | None):
+    data = get_default_crawler_issue_handling_config()
+    if isinstance(payload, dict):
+        data.update(payload)
+    data["watch_path"] = str(data.get("watch_path") or "").strip() or data["watch_path"]
+    data["output_path"] = (
+        str(data.get("output_path") or "").strip() or data["output_path"]
+    )
+    return data
+
+
+def load_crawl_issue_handling_config(db: Session):
+    payload = load_config_payload(CRAWLER_ISSUE_HANDLING_CONFIG_KEY, db)
+    return _normalize_issue_handling_config(payload)
+
+
+def get_crawl_issue_handling_config(db: Session):
+    return success(load_crawl_issue_handling_config(db))
+
+
+def save_crawl_issue_handling_config(db: Session, payload: dict):
+    data = _normalize_issue_handling_config(payload)
+    if not data["watch_path"]:
+        return error("watch_path is required")
+    if not data["output_path"]:
+        return error("output_path is required")
+
+    result = save_option(
+        JsonPayload(
+            key=CRAWLER_ISSUE_HANDLING_CONFIG_KEY,
+            payload=data,
+        ),
+        db,
+    )
+    db.commit()
+    return result
+
+
+def _serialize_crawl_issue(issue: CrawlIssue):
+    return {
+        "id": issue.id,
+        "tid": issue.tid,
+        "fid": issue.fid,
+        "title": issue.title,
+        "publish_date": issue.publish_date.isoformat()
+        if issue.publish_date
+        else None,
+        "preview_images": normalize_string_list(issue.preview_images),
+        "detail_url": issue.detail_url,
+        "size": issue.size,
+        "section": issue.section,
+        "category": issue.category,
+        "website": issue.website,
+        "status": issue.status,
+        "issue_type": issue.issue_type,
+        "stage": issue.stage,
+        "reason_code": issue.reason_code,
+        "reason_message": issue.reason_message,
+        "attachment_urls": normalize_string_list(issue.attachment_urls),
+        "attachment_names": normalize_string_list(issue.attachment_names),
+        "attachment_types": normalize_string_list(issue.attachment_types),
+        "retry_count": issue.retry_count,
+        "create_time": issue.create_time.isoformat() if issue.create_time else None,
+        "update_time": issue.update_time.isoformat() if issue.update_time else None,
+    }
+
+
+def _serialize_preview_issue(result: dict):
+    return {
+        "status": result.get("status"),
+        "issue_type": result.get("issue_type"),
+        "stage": result.get("stage"),
+        "reason_code": result.get("reason_code"),
+        "reason_message": result.get("reason_message"),
+        "attachments": result.get("attachments") or [],
+        "title": result.get("title"),
+        "category": result.get("category"),
+        "publish_date": result.get("publish_date"),
+        "preview_images": normalize_string_list(result.get("preview_images")),
+        "size": result.get("size"),
+    }
+
+
 def _upsert_article(db: Session, data: dict):
     article = (
         db.query(Article)
@@ -57,27 +156,269 @@ def _upsert_article(db: Session, data: dict):
     return "created"
 
 
-def _save_detail_url(
-    db: Session,
-    url: str,
+def build_article_payload(
+    result: dict,
+    *,
     tid: int,
+    fid: str | None,
     section: str,
     website: str,
+    detail_url: str,
 ):
-    article = sht.crawler_detail(url)
-    if not article:
+    if not result.get("ok") or not result.get("article"):
         return None
 
-    payload = dict(article)
+    payload = dict(result["article"])
     payload.update(
         {
             "tid": tid,
             "section": section,
             "website": website,
-            "detail_url": url,
+            "detail_url": detail_url,
         }
     )
-    return _upsert_article(db, payload)
+    return payload
+
+
+def build_crawl_issue_payload(
+    result: dict,
+    *,
+    tid: int,
+    fid: str | None,
+    section: str,
+    website: str,
+    detail_url: str,
+):
+    attachments = result.get("attachments") or []
+    return {
+        "tid": tid,
+        "fid": str(fid) if fid is not None else None,
+        "title": result.get("title"),
+        "publish_date": result.get("publish_date"),
+        "preview_images": normalize_string_list(result.get("preview_images")),
+        "detail_url": detail_url,
+        "size": result.get("size"),
+        "section": section,
+        "category": result.get("category"),
+        "website": website,
+        "status": result.get("status") or ISSUE_STATUS_FAILED,
+        "issue_type": result.get("issue_type") or "resource_missing",
+        "stage": result.get("stage"),
+        "reason_code": result.get("reason_code"),
+        "reason_message": result.get("reason_message"),
+        "attachment_urls": [item.get("url") for item in attachments if item.get("url")],
+        "attachment_names": [
+            item.get("name") for item in attachments if item.get("name")
+        ],
+        "attachment_types": [
+            item.get("ext") for item in attachments if item.get("ext")
+        ],
+    }
+
+
+def _issue_retry_seed(payload: dict, increment_retry: bool):
+    if payload.get("status") != ISSUE_STATUS_FAILED:
+        return 0
+    return 1 if increment_retry else 0
+
+
+def upsert_crawl_issue(db: Session, payload: dict, increment_retry: bool = False):
+    issue = (
+        db.query(CrawlIssue)
+        .filter(CrawlIssue.website == payload["website"], CrawlIssue.tid == payload["tid"])
+        .first()
+    )
+    if issue:
+        retry_count = issue.retry_count or 0
+        if payload.get("status") == ISSUE_STATUS_FAILED and increment_retry:
+            retry_count += 1
+        payload["retry_count"] = retry_count
+        for key, value in payload.items():
+            setattr(issue, key, value)
+        db.flush()
+        return issue, "updated"
+
+    payload = dict(payload)
+    payload["retry_count"] = _issue_retry_seed(payload, increment_retry)
+    issue = CrawlIssue(payload)
+    db.add(issue)
+    db.flush()
+    return issue, "created"
+
+
+def save_crawl_issues(db: Session, payloads: list[dict], increment_retry: bool = False):
+    results = []
+    for payload in payloads:
+        issue, action = upsert_crawl_issue(db, payload, increment_retry=increment_retry)
+        results.append((issue, action))
+    return results
+
+
+def clear_crawl_issues(db: Session, pairs: list[tuple[str, int]]):
+    unique_pairs = {
+        (str(website), int(tid))
+        for website, tid in pairs
+        if website and tid is not None
+    }
+    if not unique_pairs:
+        return 0
+
+    deleted = 0
+    for website, tid in unique_pairs:
+        issue = (
+            db.query(CrawlIssue)
+            .filter(CrawlIssue.website == website, CrawlIssue.tid == tid)
+            .first()
+        )
+        if issue:
+            db.delete(issue)
+            deleted += 1
+    db.flush()
+    return deleted
+
+
+def _save_detail_url(
+    db: Session,
+    url: str,
+    tid: int,
+    fid: str | None,
+    section: str,
+    website: str,
+):
+    result = sht.inspect_detail(url)
+    article_payload = build_article_payload(
+        result,
+        tid=tid,
+        fid=fid,
+        section=section,
+        website=website,
+        detail_url=url,
+    )
+    if article_payload:
+        action = _upsert_article(db, article_payload)
+        clear_crawl_issues(db, [(website, tid)])
+        return {
+            "kind": "article",
+            "action": action,
+        }
+
+    issue_payload = build_crawl_issue_payload(
+        result,
+        tid=tid,
+        fid=fid,
+        section=section,
+        website=website,
+        detail_url=url,
+    )
+    issue, action = upsert_crawl_issue(db, issue_payload)
+    return {
+        "kind": "issue",
+        "action": action,
+        "status": issue.status,
+        "issue_id": issue.id,
+    }
+
+
+def _safe_download_name(issue_id: int, tid: int, name: str, ext: str):
+    stem = Path(name or f"attachment_{issue_id}").stem
+    stem = SAFE_FILENAME_PATTERN.sub("_", stem).strip("._") or f"attachment_{issue_id}"
+    suffix = ext if ext.startswith(".") else f".{ext}"
+    return f"issue_{issue_id}_tid_{tid}_{stem}{suffix}"
+
+
+def _next_available_path(directory: Path, filename: str):
+    target = directory / filename
+    if not target.exists():
+        return target
+
+    stem = target.stem
+    suffix = target.suffix
+    counter = 1
+    while True:
+        candidate = directory / f"{stem}_{counter}{suffix}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
+def _iter_issue_output_matches(output_path: Path, issue: CrawlIssue):
+    if not output_path.exists():
+        return []
+
+    prefix = f"issue_{issue.id}_tid_{issue.tid}_"
+    return [item for item in output_path.iterdir() if item.name.startswith(prefix)]
+
+
+def _collect_output_resource_files(paths: list[Path]):
+    files = []
+    for path in paths:
+        if path.is_file() and path.suffix.lower() in OUTPUT_SCAN_EXTENSIONS:
+            files.append(path)
+            continue
+
+        if not path.is_dir():
+            continue
+
+        for item in path.rglob("*"):
+            if item.is_file() and item.suffix.lower() in OUTPUT_SCAN_EXTENSIONS:
+                files.append(item)
+    return files
+
+
+def _extract_issue_resources(issue: CrawlIssue, resource_files: list[Path]):
+    magnet_values = []
+    edk_values = []
+    seen_magnets = set()
+    seen_edks = set()
+
+    for resource_file in resource_files:
+        suffix = resource_file.suffix.lower()
+        if suffix == ".torrent":
+            magnet = sht.parse_torrent_get_magnet(
+                issue.detail_url or "",
+                str(resource_file),
+                is_local=True,
+            )
+            if magnet and magnet not in seen_magnets:
+                seen_magnets.add(magnet)
+                magnet_values.append(magnet)
+            continue
+
+        if suffix.lstrip(".") not in TEXT_ATTACHMENT_EXTENSIONS:
+            continue
+
+        try:
+            text = sht.parse_text_file(str(resource_file))
+        except Exception:
+            continue
+
+        magnet = extract_magnet(text)
+        if magnet and magnet not in seen_magnets:
+            seen_magnets.add(magnet)
+            magnet_values.append(magnet)
+
+        edk = extract_edk(text)
+        if edk and edk not in seen_edks:
+            seen_edks.add(edk)
+            edk_values.append(edk)
+
+    return magnet_values, edk_values
+
+
+def _build_article_from_issue(issue: CrawlIssue, magnet_values: list[str], edk_values: list[str]):
+    return {
+        "tid": issue.tid,
+        "title": issue.title or f"tid-{issue.tid}",
+        "publish_date": issue.publish_date,
+        "magnet": magnet_values,
+        "preview_images": normalize_string_list(issue.preview_images),
+        "detail_url": issue.detail_url,
+        "size": issue.size,
+        "section": issue.section or "manual",
+        "category": issue.category,
+        "website": issue.website or "sehuatang",
+        "edk": edk_values,
+    }
 
 
 def preview_url(url: str):
@@ -108,21 +449,21 @@ def preview_url(url: str):
         )
 
     if mod == "viewthread" or _extract_query_value(url, "tid"):
-        article = sht.crawler_detail(url)
-        if not article:
-            return error("failed to crawl target url")
-
-        article["tid"] = _extract_query_value(url, "tid")
-        article["detail_url"] = url
-        article["website"] = parsed.netloc
-        return success(
-            {
-                "mode": "viewthread",
-                "url": url,
-                "article": article,
-                "runtime": runtime,
-            }
-        )
+        result = sht.inspect_detail(url)
+        payload = {
+            "mode": "viewthread",
+            "url": url,
+            "runtime": runtime,
+        }
+        if result.get("ok") and result.get("article"):
+            article = dict(result["article"])
+            article["tid"] = _extract_query_value(url, "tid")
+            article["detail_url"] = url
+            article["website"] = parsed.netloc
+            payload["article"] = article
+        else:
+            payload["issue"] = _serialize_preview_issue(result)
+        return success(payload)
 
     return error("unsupported url, only forumdisplay and viewthread are supported")
 
@@ -158,26 +499,28 @@ def save_url(url: str, db: Session, fid: str | None = None):
 
         created = 0
         updated = 0
+        issue_saved = 0
         failed_ids = []
         for tid in tid_list:
             detail_url = _build_detail_url(url, tid)
-            status = _save_detail_url(
+            outcome = _save_detail_url(
                 db=db,
                 url=detail_url,
                 tid=tid,
+                fid=str(target_fid),
                 section=section,
                 website=website,
             )
-            if status == "created":
-                created += 1
-                continue
-            if status == "updated":
-                if tid in existing_tids:
+            if outcome["kind"] == "article":
+                if outcome["action"] == "updated" and tid in existing_tids:
                     updated += 1
                 else:
                     created += 1
                 continue
-            failed_ids.append(tid)
+
+            issue_saved += 1
+            if outcome.get("status") == ISSUE_STATUS_FAILED:
+                failed_ids.append(tid)
 
         db.flush()
         return success(
@@ -189,6 +532,7 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 "count": len(tid_list),
                 "created": created,
                 "updated": updated,
+                "issue_saved": issue_saved,
                 "failed_ids": failed_ids,
             },
             message="resources saved",
@@ -205,15 +549,14 @@ def save_url(url: str, db: Session, fid: str | None = None):
             url,
             section_config.get("website") if section_config else None,
         )
-        status = _save_detail_url(
+        outcome = _save_detail_url(
             db=db,
             url=url,
             tid=int(tid),
+            fid=fid,
             section=section,
             website=website,
         )
-        if not status:
-            return error("failed to crawl target url")
 
         db.flush()
         return success(
@@ -222,12 +565,225 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 "tid": int(tid),
                 "section": section,
                 "website": website,
-                "action": status,
+                "action": outcome["action"]
+                if outcome["kind"] == "article"
+                else "issue_saved",
+                "issue_status": outcome.get("status"),
+                "issue_id": outcome.get("issue_id"),
             },
             message="resource saved",
         )
 
     return error("unsupported url, only forumdisplay and viewthread are supported")
+
+
+def list_crawl_issues(
+    db: Session,
+    page: int = 1,
+    per_page: int = 20,
+    status: str | None = None,
+    issue_type: str | None = None,
+    keyword: str | None = None,
+):
+    query = db.query(CrawlIssue)
+
+    if status and status != "all":
+        query = query.filter(CrawlIssue.status == status)
+    if issue_type and issue_type != "all":
+        query = query.filter(CrawlIssue.issue_type == issue_type)
+
+    if keyword:
+        stripped = keyword.strip()
+        if stripped:
+            conditions = [
+                CrawlIssue.title.ilike(f"%{stripped}%"),
+                CrawlIssue.section.ilike(f"%{stripped}%"),
+                CrawlIssue.reason_message.ilike(f"%{stripped}%"),
+            ]
+            if stripped.isdigit():
+                conditions.append(CrawlIssue.tid == int(stripped))
+            query = query.filter(or_(*conditions))
+
+    total = query.count()
+    offset = (page - 1) * per_page
+    items = (
+        query.order_by(CrawlIssue.update_time.desc(), CrawlIssue.id.desc())
+        .offset(offset)
+        .limit(per_page)
+        .all()
+    )
+
+    return success(
+        {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "items": [_serialize_crawl_issue(item) for item in items],
+            "paths": load_crawl_issue_handling_config(db),
+        }
+    )
+
+
+def retry_crawl_issue(db: Session, issue_id: int):
+    issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
+    if not issue:
+        return error("crawl issue not found", code=404)
+
+    result = sht.inspect_detail(issue.detail_url)
+    article_payload = build_article_payload(
+        result,
+        tid=issue.tid,
+        fid=issue.fid,
+        section=issue.section,
+        website=issue.website,
+        detail_url=issue.detail_url,
+    )
+    if article_payload:
+        action = _upsert_article(db, article_payload)
+        db.delete(issue)
+        db.flush()
+        return success(
+            {
+                "action": action,
+                "deleted_issue_id": issue_id,
+            },
+            message="crawl issue resolved",
+        )
+
+    issue_payload = build_crawl_issue_payload(
+        result,
+        tid=issue.tid,
+        fid=issue.fid,
+        section=issue.section,
+        website=issue.website,
+        detail_url=issue.detail_url,
+    )
+    updated_issue, _ = upsert_crawl_issue(db, issue_payload, increment_retry=True)
+    return success(
+        {
+            "issue": _serialize_crawl_issue(updated_issue),
+        },
+        message="crawl issue updated",
+    )
+
+
+def ignore_crawl_issue(db: Session, issue_id: int):
+    issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
+    if not issue:
+        return error("crawl issue not found", code=404)
+    issue.status = ISSUE_STATUS_IGNORED
+    db.flush()
+    return success(
+        {
+            "issue": _serialize_crawl_issue(issue),
+        },
+        message="crawl issue ignored",
+    )
+
+
+def download_crawl_issue(db: Session, issue_id: int):
+    issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue_id).first()
+    if not issue:
+        return error("crawl issue not found", code=404)
+
+    attachment_urls = normalize_string_list(issue.attachment_urls)
+    attachment_names = normalize_string_list(issue.attachment_names)
+    attachment_types = normalize_string_list(issue.attachment_types)
+    if not attachment_urls:
+        return error("no attachment urls found for this issue")
+
+    config = load_crawl_issue_handling_config(db)
+    watch_path = Path(config["watch_path"])
+    watch_path.mkdir(parents=True, exist_ok=True)
+
+    downloaded_files = []
+    for index, attachment_url in enumerate(attachment_urls):
+        attachment_name = (
+            attachment_names[index]
+            if index < len(attachment_names)
+            else f"attachment_{index + 1}"
+        )
+        attachment_type = (
+            attachment_types[index]
+            if index < len(attachment_types)
+            else Path(urlparse(attachment_url).path).suffix.lstrip(".") or "bin"
+        )
+        filename = _safe_download_name(
+            issue.id,
+            issue.tid,
+            attachment_name,
+            attachment_type,
+        )
+        target = _next_available_path(watch_path, filename)
+        payload = sht.download_attachment_bytes(issue.detail_url or attachment_url, attachment_url)
+        target.write_bytes(payload)
+        downloaded_files.append(str(target))
+
+    issue.status = ISSUE_STATUS_DOWNLOADED
+    if issue.issue_type == ISSUE_TYPE_ARCHIVE:
+        issue.reason_message = f"downloaded {len(downloaded_files)} archive file(s)"
+    db.flush()
+    return success(
+        {
+            "downloaded_files": downloaded_files,
+            "issue": _serialize_crawl_issue(issue),
+        },
+        message="attachments downloaded",
+    )
+
+
+def import_crawl_issue_outputs(db: Session, issue_id: int | None = None):
+    config = load_crawl_issue_handling_config(db)
+    output_path = Path(config["output_path"])
+    query = db.query(CrawlIssue).filter(
+        CrawlIssue.issue_type == ISSUE_TYPE_ARCHIVE,
+        CrawlIssue.status != ISSUE_STATUS_IGNORED,
+    )
+    if issue_id is not None:
+        query = query.filter(CrawlIssue.id == issue_id)
+    issues = query.order_by(CrawlIssue.update_time.asc()).all()
+
+    imported = 0
+    deleted_issue_ids = []
+    skipped = []
+
+    for issue in issues:
+        matches = _iter_issue_output_matches(output_path, issue)
+        if not matches:
+            skipped.append(
+                {
+                    "issue_id": issue.id,
+                    "reason": "output not found",
+                }
+            )
+            continue
+
+        resource_files = _collect_output_resource_files(matches)
+        magnet_values, edk_values = _extract_issue_resources(issue, resource_files)
+        if not magnet_values and not edk_values:
+            skipped.append(
+                {
+                    "issue_id": issue.id,
+                    "reason": "no supported resources found in output",
+                }
+            )
+            continue
+
+        article_payload = _build_article_from_issue(issue, magnet_values, edk_values)
+        _upsert_article(db, article_payload)
+        deleted_issue_ids.append(issue.id)
+        db.delete(issue)
+        imported += 1
+
+    db.flush()
+    return success(
+        {
+            "imported": imported,
+            "deleted_issue_ids": deleted_issue_ids,
+            "skipped": skipped,
+        },
+        message="crawl issue outputs imported",
+    )
 
 
 def reset_resource_table(db: Session):
@@ -244,13 +800,14 @@ def reset_resource_table(db: Session):
 
 def reset_test_space(db: Session):
     article_count = db.execute(select(func.count(Article.id))).scalar() or 0
+    issue_count = db.execute(select(func.count(CrawlIssue.id))).scalar() or 0
     task_count = db.execute(select(func.count(Task.id))).scalar() or 0
     config_count = db.execute(select(func.count(Config.id))).scalar() or 0
     user_count = db.execute(select(func.count(User.id))).scalar() or 0
 
     db.execute(
         text(
-            "TRUNCATE TABLE sht.article, sht.task, sht.config, sht.\"user\" RESTART IDENTITY"
+            'TRUNCATE TABLE sht.article, sht.crawl_issue, sht.task, sht.config, sht."user" RESTART IDENTITY'
         )
     )
 
@@ -264,6 +821,7 @@ def reset_test_space(db: Session):
     return success(
         {
             "article_deleted": article_count,
+            "crawl_issue_deleted": issue_count,
             "task_deleted": task_count,
             "config_deleted": config_count,
             "user_deleted": user_count,

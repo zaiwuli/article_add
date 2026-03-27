@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Bug } from 'lucide-react'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
@@ -5,9 +6,13 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { CrawlerIssueCenter } from '@/features/crawler/issue-center'
 import { CrawlerForm } from '@/features/settings/crawler/crawler-form'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function CrawlerCenter() {
+  const [activeTab, setActiveTab] = useState<'config' | 'issues'>('config')
+
   return (
     <>
       <Header fixed>
@@ -27,7 +32,17 @@ export function CrawlerCenter() {
           </div>
         </div>
 
-        <CrawlerForm />
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'config' | 'issues')}
+        >
+          <TabsList className='w-full justify-start gap-2 rounded-2xl border bg-transparent p-1'>
+            <TabsTrigger value='config'>抓取配置</TabsTrigger>
+            <TabsTrigger value='issues'>抓取处理</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {activeTab === 'config' ? <CrawlerForm /> : <CrawlerIssueCenter />}
       </Main>
     </>
   )
