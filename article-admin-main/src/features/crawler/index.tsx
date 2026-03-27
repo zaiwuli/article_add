@@ -1,17 +1,76 @@
-import { useState } from 'react'
-import { Bug } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Blocks, Bug, Settings2, Wrench } from 'lucide-react'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ImageModeSwitch } from '@/components/image-mode-switch.tsx'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { CrawlerIssueCenter } from '@/features/crawler/issue-center'
+import { CrawlerModuleCenter } from '@/features/crawler/modules-center'
 import { CrawlerForm } from '@/features/settings/crawler/crawler-form'
+import { cn } from '@/lib/utils'
 
-export function CrawlerCenter() {
-  const [activeTab, setActiveTab] = useState<'issues' | 'config'>('issues')
+export type CrawlerTab = 'issues' | 'config' | 'modules'
+
+const crawlerTabs: Array<{
+  value: CrawlerTab
+  label: string
+  description: string
+  icon: typeof Wrench
+}> = [
+  {
+    value: 'issues',
+    label: '抓取处理',
+    description: '查看抓取异常、压缩包附件和一键处理动作。',
+    icon: Wrench,
+  },
+  {
+    value: 'config',
+    label: '抓取配置',
+    description: '维护抓取网络、处理目录和自动下载解压策略。',
+    icon: Settings2,
+  },
+  {
+    value: 'modules',
+    label: '抓取模块',
+    description: '单独维护模块列表，任务页和抓取链路会直接读取这里。',
+    icon: Blocks,
+  },
+]
+
+function CrawlerTabLink({
+  value,
+  label,
+  icon: Icon,
+  active,
+}: {
+  value: CrawlerTab
+  label: string
+  icon: typeof Wrench
+  active: boolean
+}) {
+  return (
+    <Link
+      to='/crawler'
+      search={{ tab: value }}
+      className={cn(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-medium transition-colors',
+        active
+          ? 'border-primary/30 bg-background text-foreground shadow-sm'
+          : 'border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
+      )}
+    >
+      <Icon className='h-4 w-4' />
+      {label}
+    </Link>
+  )
+}
+
+export function CrawlerCenter({ activeTab }: { activeTab: CrawlerTab }) {
+  const activeMeta =
+    crawlerTabs.find((item) => item.value === activeTab) ?? crawlerTabs[0]
 
   return (
     <>
@@ -25,30 +84,43 @@ export function CrawlerCenter() {
       </Header>
 
       <Main className='flex h-[calc(100vh-4rem)] flex-col gap-4'>
-        <div className='mb-2 flex items-start justify-between gap-4'>
-          <div>
-            <div className='mb-2 flex items-center gap-3'>
+        <div className='flex flex-wrap items-start justify-between gap-4 rounded-2xl border p-4 shadow-sm'>
+          <div className='space-y-3'>
+            <div className='flex items-center gap-3'>
               <Bug className='h-7 w-7 text-primary' />
-              <h1 className='text-2xl font-bold'>抓取中心</h1>
+              <div>
+                <h1 className='text-2xl font-bold'>抓取中心</h1>
+                <p className='text-sm text-muted-foreground'>
+                  抓取处理、抓取配置和抓取模块已经拆成平级页面，方便分别维护。
+                </p>
+              </div>
             </div>
-            <p className='text-sm text-muted-foreground'>
-              这里集中展示抓取异常、附件处理和抓取配置。压缩包附件目前支持探测、
-              下载和解压结果导入，但还不支持自动解压。
-            </p>
+
+            <div className='flex flex-wrap gap-2'>
+              {crawlerTabs.map((item) => (
+                <CrawlerTabLink
+                  key={item.value}
+                  value={item.value}
+                  label={item.label}
+                  icon={item.icon}
+                  active={item.value === activeTab}
+                />
+              ))}
+            </div>
           </div>
+
+          <Badge variant='outline' className='h-8 rounded-full px-3 text-xs'>
+            当前页面：{activeMeta.label}
+          </Badge>
         </div>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'issues' | 'config')}
-        >
-          <TabsList className='w-full justify-start gap-2 rounded-2xl border bg-transparent p-1'>
-            <TabsTrigger value='issues'>抓取处理</TabsTrigger>
-            <TabsTrigger value='config'>抓取配置</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className='rounded-2xl border bg-muted/15 px-4 py-3 text-sm text-muted-foreground'>
+          {activeMeta.description}
+        </div>
 
-        {activeTab === 'issues' ? <CrawlerIssueCenter /> : <CrawlerForm />}
+        {activeTab === 'issues' && <CrawlerIssueCenter />}
+        {activeTab === 'config' && <CrawlerForm />}
+        {activeTab === 'modules' && <CrawlerModuleCenter />}
       </Main>
     </>
   )

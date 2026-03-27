@@ -124,7 +124,12 @@ def sync_new_article(fid, start_page=1, max_page=100) -> Tuple[int, int, int]:
 
     inserted_count = _save_articles(articles)
     with session_scope() as session:
-        crawler_service.save_crawl_issues(session, issue_payloads)
+        saved_issues = crawler_service.save_crawl_issues(session, issue_payloads)
+        crawler_service.process_saved_archive_issues(
+            session,
+            [issue for issue, _ in saved_issues],
+            trigger="crawler",
+        )
         crawler_service.clear_crawl_issues(session, resolved_pairs)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
@@ -164,7 +169,12 @@ def sync_new_article_no_stop(fid, start_page=1, max_page=100) -> Tuple[int, int,
 
     inserted_count = _save_articles(articles)
     with session_scope() as session:
-        crawler_service.save_crawl_issues(session, issue_payloads)
+        saved_issues = crawler_service.save_crawl_issues(session, issue_payloads)
+        crawler_service.process_saved_archive_issues(
+            session,
+            [issue for issue, _ in saved_issues],
+            trigger="crawler",
+        )
         crawler_service.clear_crawl_issues(session, resolved_pairs)
     retry_fail_id_list = retry_fail_tid(fid, fail_id_list)
     save_fail_tid_to_file(fid, retry_fail_id_list)
@@ -399,7 +409,16 @@ def retry_fail_tid(fid, fail_id_list):
 
     _save_articles(articles)
     with session_scope() as session:
-        crawler_service.save_crawl_issues(session, issue_payloads, increment_retry=True)
+        saved_issues = crawler_service.save_crawl_issues(
+            session,
+            issue_payloads,
+            increment_retry=True,
+        )
+        crawler_service.process_saved_archive_issues(
+            session,
+            [issue for issue, _ in saved_issues],
+            trigger="retry",
+        )
         crawler_service.clear_crawl_issues(session, resolved_pairs)
     logger.info(f"[{section}] 仍然失败的 tid 列表: {fail_id_list}")
     return fail_id_list

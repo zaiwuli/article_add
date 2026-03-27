@@ -12,6 +12,7 @@ from pyquery import PyQuery as pq
 from app.core import settings
 from app.core.database import session_scope
 from app.models import Config
+from app.modules.archive_extractor import extract_password_candidates
 from app.utils.log import logger
 
 CRAWLER_RUNTIME_CONFIG_KEY = "CrawlerRuntime"
@@ -386,6 +387,7 @@ class SHT:
                     "stage": "detail_fetch",
                     "reason_code": "detail_fetch_failed",
                     "reason_message": "详情页加载失败",
+                    "password_candidates": [],
                     "attachments": [],
                     "title": None,
                     "category": None,
@@ -413,8 +415,14 @@ class SHT:
             }
 
             all_text = doc("div.blockcode").text()
+            message_text = doc("div.message").text()
             magnet = extract_magnet(all_text)
             edk = extract_edk(all_text)
+            password_candidates = extract_password_candidates(
+                title,
+                message_text,
+                all_text,
+            )
             attachment_candidates = self.collect_attachment_candidates(doc, url)
             text_candidates = [
                 item
@@ -467,6 +475,7 @@ class SHT:
                         "edk": [edk] if edk else [],
                     },
                     "attachments": attachment_candidates,
+                    "password_candidates": password_candidates,
                     **base_payload,
                 }
 
@@ -478,6 +487,7 @@ class SHT:
                     "stage": "resource_parse",
                     "reason_code": "archive_detected",
                     "reason_message": "检测到压缩包附件，需要下载后在外部解压",
+                    "password_candidates": password_candidates,
                     "attachments": archive_candidates,
                     "article": None,
                     **base_payload,
@@ -494,6 +504,7 @@ class SHT:
                 "stage": "resource_parse",
                 "reason_code": "download_resource_missing",
                 "reason_message": reason_message,
+                "password_candidates": password_candidates,
                 "attachments": attachment_candidates,
                 "article": None,
                 **base_payload,
@@ -507,6 +518,7 @@ class SHT:
                 "stage": "detail_parse",
                 "reason_code": "crawl_detail_exception",
                 "reason_message": f"详情解析异常：{str(exc)}",
+                "password_candidates": [],
                 "attachments": [],
                 "title": None,
                 "category": None,

@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.api.services.article_service import normalize_string_list
 from app.api.services.config_service import (
+    CRAWLER_AUTO_EXTRACT_CONFIG_KEY,
     CRAWLER_ISSUE_HANDLING_CONFIG_KEY,
+    get_default_crawler_auto_extract_config,
     get_default_crawler_issue_handling_config,
     load_config_payload,
     save_option,
@@ -22,6 +24,10 @@ from app.models.config import Config
 from app.models.crawl_issue import CrawlIssue
 from app.models.task import Task
 from app.models.user import User
+from app.modules.archive_extractor import (
+    extract_archive_file,
+    split_password_dictionary,
+)
 from app.modules.sht import TEXT_ATTACHMENT_EXTENSIONS, extract_edk, extract_magnet, sht
 from app.scheduler.sht_section_registry import get_section_config
 from app.schemas.config import JsonPayload
@@ -74,6 +80,27 @@ def load_crawl_issue_handling_config(db: Session):
     return _normalize_issue_handling_config(payload)
 
 
+def _normalize_auto_extract_config(payload: dict | None):
+    data = get_default_crawler_auto_extract_config()
+    if isinstance(payload, dict):
+        data.update(payload)
+    data["enabled"] = bool(data.get("enabled", False))
+    data["schedule_enabled"] = bool(data.get("schedule_enabled", False))
+    data["schedule_cron"] = str(data.get("schedule_cron") or "").strip()
+    data["archive_path"] = str(data.get("archive_path") or "").strip() or data["archive_path"]
+    data["move_original"] = bool(data.get("move_original", True))
+    data["delete_original"] = bool(data.get("delete_original", False))
+    if data["delete_original"]:
+        data["move_original"] = False
+    data["password_dictionary"] = str(data.get("password_dictionary") or "").strip()
+    return data
+
+
+def load_crawl_auto_extract_config(db: Session):
+    payload = load_config_payload(CRAWLER_AUTO_EXTRACT_CONFIG_KEY, db)
+    return _normalize_auto_extract_config(payload)
+
+
 def get_crawl_issue_handling_config(db: Session):
     return success(load_crawl_issue_handling_config(db))
 
@@ -116,6 +143,7 @@ def _serialize_crawl_issue(issue: CrawlIssue):
         "stage": issue.stage,
         "reason_code": issue.reason_code,
         "reason_message": issue.reason_message,
+        "password_candidates": normalize_string_list(issue.password_candidates),
         "attachment_urls": normalize_string_list(issue.attachment_urls),
         "attachment_names": normalize_string_list(issue.attachment_names),
         "attachment_types": normalize_string_list(issue.attachment_types),
@@ -132,6 +160,7 @@ def _serialize_preview_issue(result: dict):
         "stage": result.get("stage"),
         "reason_code": result.get("reason_code"),
         "reason_message": result.get("reason_message"),
+        "password_candidates": normalize_string_list(result.get("password_candidates")),
         "attachments": result.get("attachments") or [],
         "title": result.get("title"),
         "category": result.get("category"),
@@ -206,6 +235,7 @@ def build_crawl_issue_payload(
         "stage": result.get("stage"),
         "reason_code": result.get("reason_code"),
         "reason_message": result.get("reason_message"),
+        "password_candidates": normalize_string_list(result.get("password_candidates")),
         "attachment_urls": [item.get("url") for item in attachments if item.get("url")],
         "attachment_names": [
             item.get("name") for item in attachments if item.get("name")
@@ -316,6 +346,7 @@ def _save_detail_url(
         "action": action,
         "status": issue.status,
         "issue_id": issue.id,
+        "issue_type": issue.issue_type,
     }
 
 
@@ -339,6 +370,268 @@ def _next_available_path(directory: Path, filename: str):
         if not candidate.exists():
             return candidate
         counter += 1
+
+
+def _issue_file_prefix(issue: CrawlIssue):
+    return f"issue_{issue.id}_tid_{issue.tid}_"
+
+
+def _list_issue_archive_files(issue: CrawlIssue, watch_path: Path):
+    if not watch_path.exists():
+        return []
+    prefix = _issue_file_prefix(issue)
+    return sorted(
+        [
+            item
+            for item in watch_path.iterdir()
+            if item.is_file()
+            and item.name.startswith(prefix)
+            and item.suffix.lower() in {".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".tbz2", ".iso"}
+        ],
+        key=lambda item: item.name,
+    )
+
+
+def _download_issue_attachments(
+    issue: CrawlIssue,
+    watch_path: Path,
+    *,
+    force_download: bool = False,
+):
+    watch_path.mkdir(parents=True, exist_ok=True)
+    existing_files = _list_issue_archive_files(issue, watch_path)
+    if existing_files and not force_download:
+        return [str(item) for item in existing_files], False
+
+    attachment_urls = normalize_string_list(issue.attachment_urls)
+    attachment_names = normalize_string_list(issue.attachment_names)
+    attachment_types = normalize_string_list(issue.attachment_types)
+    if not attachment_urls:
+        return [], False
+
+    downloaded_files = []
+    for index, attachment_url in enumerate(attachment_urls):
+        attachment_name = (
+            attachment_names[index]
+            if index < len(attachment_names)
+            else f"attachment_{index + 1}"
+        )
+        attachment_type = (
+            attachment_types[index]
+            if index < len(attachment_types)
+            else Path(urlparse(attachment_url).path).suffix.lstrip(".") or "bin"
+        )
+        filename = _safe_download_name(
+            issue.id,
+            issue.tid,
+            attachment_name,
+            attachment_type,
+        )
+        target = _next_available_path(watch_path, filename)
+        payload = sht.download_attachment_bytes(issue.detail_url or attachment_url, attachment_url)
+        target.write_bytes(payload)
+        downloaded_files.append(str(target))
+
+    return downloaded_files, True
+
+
+def _collect_issue_password_candidates(issue: CrawlIssue, auto_config: dict):
+    values = []
+    values.extend(normalize_string_list(issue.password_candidates))
+    values.extend(split_password_dictionary(auto_config.get("password_dictionary")))
+    return values
+
+
+def _auto_process_archive_issue(
+    db: Session,
+    issue: CrawlIssue,
+    *,
+    auto_config: dict,
+    force_download: bool = False,
+):
+    issue_handling_config = load_crawl_issue_handling_config(db)
+    watch_path = Path(issue_handling_config["watch_path"])
+    output_path = Path(issue_handling_config["output_path"])
+    archive_path = Path(auto_config["archive_path"])
+
+    downloaded_files, downloaded_now = _download_issue_attachments(
+        issue,
+        watch_path,
+        force_download=force_download,
+    )
+    archive_files = _list_issue_archive_files(issue, watch_path)
+    if not archive_files:
+        issue.status = ISSUE_STATUS_FAILED
+        issue.reason_code = "archive_download_missing"
+        issue.reason_message = "未找到可处理的压缩包附件"
+        db.flush()
+        return {
+            "issue_id": issue.id,
+            "title": issue.title,
+            "downloaded": 0,
+            "extracted": 0,
+            "imported": 0,
+            "status": "failed",
+            "message": issue.reason_message,
+        }
+
+    issue.status = ISSUE_STATUS_DOWNLOADED
+    issue.reason_code = "archive_downloaded"
+    issue.reason_message = f"已下载 {len(archive_files)} 个压缩包附件，准备自动解压"
+    db.flush()
+
+    password_candidates = _collect_issue_password_candidates(issue, auto_config)
+    extracted_count = 0
+    errors = []
+    for archive_file in archive_files:
+        result = extract_archive_file(
+            archive_file,
+            output_root=output_path,
+            archive_root=archive_path,
+            password_candidates=password_candidates,
+            move_original=bool(auto_config.get("move_original", True)),
+            delete_original=bool(auto_config.get("delete_original", False)),
+        )
+        if result.get("ok"):
+            extracted_count += 1
+            continue
+        errors.append(result.get("message") or "解压失败")
+
+    import_result = import_crawl_issue_outputs(db, issue_id=issue.id)
+    import_data = import_result.get("data") or {}
+    imported = int(import_data.get("imported") or 0)
+
+    refreshed_issue = db.query(CrawlIssue).filter(CrawlIssue.id == issue.id).first()
+    if imported > 0 and refreshed_issue is None:
+        return {
+            "issue_id": issue.id,
+            "title": issue.title,
+            "downloaded": len(downloaded_files) if downloaded_now else 0,
+            "extracted": extracted_count,
+            "imported": imported,
+            "status": "resolved",
+            "message": "自动下载、解压并导入成功",
+        }
+
+    if refreshed_issue:
+        if extracted_count > 0 and not errors:
+            refreshed_issue.status = ISSUE_STATUS_DOWNLOADED
+            refreshed_issue.reason_code = "archive_extracted_no_resource"
+            refreshed_issue.reason_message = "已完成解压，但暂未发现可导入资源"
+        else:
+            refreshed_issue.status = ISSUE_STATUS_FAILED
+            refreshed_issue.reason_code = "archive_auto_extract_failed"
+            refreshed_issue.reason_message = "; ".join(errors[:2]) or "自动解压失败"
+        db.flush()
+
+    return {
+        "issue_id": issue.id,
+        "title": issue.title,
+        "downloaded": len(downloaded_files) if downloaded_now else 0,
+        "extracted": extracted_count,
+        "imported": imported,
+        "status": "failed" if refreshed_issue and refreshed_issue.status == ISSUE_STATUS_FAILED else "pending",
+        "message": refreshed_issue.reason_message if refreshed_issue else "自动处理完成",
+    }
+
+
+def process_crawl_issues_auto(
+    db: Session,
+    *,
+    issue_id: int | None = None,
+    trigger: str = "manual",
+):
+    auto_config = load_crawl_auto_extract_config(db)
+    if trigger != "manual" and not auto_config.get("enabled"):
+        return success(
+            {
+                "total": 0,
+                "downloaded": 0,
+                "extracted": 0,
+                "imported": 0,
+                "failed": 0,
+                "items": [],
+            },
+            message="自动下载解压未开启，已跳过",
+        )
+
+    query = db.query(CrawlIssue).filter(
+        CrawlIssue.issue_type == ISSUE_TYPE_ARCHIVE,
+        CrawlIssue.status != ISSUE_STATUS_IGNORED,
+    )
+    if issue_id is not None:
+        query = query.filter(CrawlIssue.id == issue_id)
+    issues = query.order_by(CrawlIssue.update_time.asc(), CrawlIssue.id.asc()).all()
+    if not issues:
+        return success(
+            {
+                "total": 0,
+                "downloaded": 0,
+                "extracted": 0,
+                "imported": 0,
+                "failed": 0,
+                "items": [],
+            },
+            message="当前没有待处理的压缩包记录",
+        )
+
+    items = []
+    downloaded = 0
+    extracted = 0
+    imported = 0
+    failed = 0
+    for issue in issues:
+        result = _auto_process_archive_issue(
+            db,
+            issue,
+            auto_config=auto_config,
+        )
+        items.append(result)
+        downloaded += int(result.get("downloaded") or 0)
+        extracted += int(result.get("extracted") or 0)
+        imported += int(result.get("imported") or 0)
+        if result.get("status") == "failed":
+            failed += 1
+
+    message = "自动下载解压处理完成"
+    if trigger == "manual":
+        message = "已执行一次自动下载解压"
+
+    return success(
+        {
+            "total": len(issues),
+            "downloaded": downloaded,
+            "extracted": extracted,
+            "imported": imported,
+            "failed": failed,
+            "items": items,
+        },
+        message=message,
+    )
+
+
+def process_saved_archive_issues(
+    db: Session,
+    issues: list[CrawlIssue],
+    *,
+    trigger: str = "auto",
+):
+    auto_config = load_crawl_auto_extract_config(db)
+    if not auto_config.get("enabled"):
+        return []
+
+    results = []
+    for issue in issues:
+        if issue.issue_type != ISSUE_TYPE_ARCHIVE:
+            continue
+        results.append(
+            _auto_process_archive_issue(
+                db,
+                issue,
+                auto_config=auto_config,
+            )
+        )
+    return results
 
 
 def _iter_issue_output_matches(output_path: Path, issue: CrawlIssue):
@@ -501,6 +794,7 @@ def save_url(url: str, db: Session, fid: str | None = None):
         updated = 0
         issue_saved = 0
         failed_ids = []
+        archive_issue_ids = []
         for tid in tid_list:
             detail_url = _build_detail_url(url, tid)
             outcome = _save_detail_url(
@@ -521,6 +815,21 @@ def save_url(url: str, db: Session, fid: str | None = None):
             issue_saved += 1
             if outcome.get("status") == ISSUE_STATUS_FAILED:
                 failed_ids.append(tid)
+            if outcome.get("issue_type") == ISSUE_TYPE_ARCHIVE and outcome.get("issue_id"):
+                archive_issue_ids.append(int(outcome["issue_id"]))
+
+        auto_process_result = None
+        if archive_issue_ids and load_crawl_auto_extract_config(db).get("enabled"):
+            archive_issues = (
+                db.query(CrawlIssue)
+                .filter(CrawlIssue.id.in_(archive_issue_ids))
+                .all()
+            )
+            auto_results = process_saved_archive_issues(db, archive_issues, trigger="save_url")
+            auto_process_result = {
+                "processed": len(auto_results),
+                "imported": sum(int(item.get("imported") or 0) for item in auto_results),
+            }
 
         db.flush()
         return success(
@@ -534,6 +843,7 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 "updated": updated,
                 "issue_saved": issue_saved,
                 "failed_ids": failed_ids,
+                "auto_process": auto_process_result,
             },
             message="抓取结果已保存",
         )
@@ -558,6 +868,18 @@ def save_url(url: str, db: Session, fid: str | None = None):
             website=website,
         )
 
+        auto_process_result = None
+        if (
+            outcome["kind"] == "issue"
+            and outcome.get("issue_type") == ISSUE_TYPE_ARCHIVE
+            and outcome.get("issue_id")
+            and load_crawl_auto_extract_config(db).get("enabled")
+        ):
+            saved_issue = db.query(CrawlIssue).filter(CrawlIssue.id == outcome["issue_id"]).first()
+            if saved_issue:
+                results = process_saved_archive_issues(db, [saved_issue], trigger="save_url")
+                auto_process_result = results[0] if results else None
+
         db.flush()
         return success(
             {
@@ -570,6 +892,7 @@ def save_url(url: str, db: Session, fid: str | None = None):
                 else "issue_saved",
                 "issue_status": outcome.get("status"),
                 "issue_id": outcome.get("issue_id"),
+                "auto_process": auto_process_result,
             },
             message="抓取结果已保存",
         )
@@ -604,6 +927,22 @@ def list_crawl_issues(
                 conditions.append(CrawlIssue.tid == int(stripped))
             query = query.filter(or_(*conditions))
 
+    summary_rows = (
+        query.with_entities(CrawlIssue.status, func.count(CrawlIssue.id))
+        .group_by(CrawlIssue.status)
+        .all()
+    )
+    summary = {
+        "total": 0,
+        "failed": 0,
+        "pending_manual": 0,
+        "downloaded": 0,
+        "ignored": 0,
+    }
+    for status_key, count in summary_rows:
+        summary[str(status_key)] = int(count)
+        summary["total"] += int(count)
+
     total = query.count()
     offset = (page - 1) * per_page
     items = (
@@ -620,6 +959,8 @@ def list_crawl_issues(
             "total": total,
             "items": [_serialize_crawl_issue(item) for item in items],
             "paths": load_crawl_issue_handling_config(db),
+            "auto_extract": load_crawl_auto_extract_config(db),
+            "summary": summary,
         }
     )
 
@@ -659,9 +1000,17 @@ def retry_crawl_issue(db: Session, issue_id: int):
         detail_url=issue.detail_url,
     )
     updated_issue, _ = upsert_crawl_issue(db, issue_payload, increment_retry=True)
+    auto_process_result = None
+    if (
+        updated_issue.issue_type == ISSUE_TYPE_ARCHIVE
+        and load_crawl_auto_extract_config(db).get("enabled")
+    ):
+        results = process_saved_archive_issues(db, [updated_issue], trigger="retry")
+        auto_process_result = results[0] if results else None
     return success(
         {
             "issue": _serialize_crawl_issue(updated_issue),
+            "auto_process": auto_process_result,
         },
         message="抓取问题已更新",
     )
@@ -686,47 +1035,29 @@ def download_crawl_issue(db: Session, issue_id: int):
     if not issue:
         return error("未找到抓取问题记录", code=404)
 
-    attachment_urls = normalize_string_list(issue.attachment_urls)
-    attachment_names = normalize_string_list(issue.attachment_names)
-    attachment_types = normalize_string_list(issue.attachment_types)
-    if not attachment_urls:
-        return error("当前问题没有可下载的附件链接")
-
     config = load_crawl_issue_handling_config(db)
     watch_path = Path(config["watch_path"])
-    watch_path.mkdir(parents=True, exist_ok=True)
-
-    downloaded_files = []
-    for index, attachment_url in enumerate(attachment_urls):
-        attachment_name = (
-            attachment_names[index]
-            if index < len(attachment_names)
-            else f"attachment_{index + 1}"
-        )
-        attachment_type = (
-            attachment_types[index]
-            if index < len(attachment_types)
-            else Path(urlparse(attachment_url).path).suffix.lstrip(".") or "bin"
-        )
-        filename = _safe_download_name(
-            issue.id,
-            issue.tid,
-            attachment_name,
-            attachment_type,
-        )
-        target = _next_available_path(watch_path, filename)
-        payload = sht.download_attachment_bytes(issue.detail_url or attachment_url, attachment_url)
-        target.write_bytes(payload)
-        downloaded_files.append(str(target))
+    downloaded_files, _ = _download_issue_attachments(
+        issue,
+        watch_path,
+        force_download=True,
+    )
+    if not downloaded_files:
+        return error("当前问题没有可下载的附件链接")
 
     issue.status = ISSUE_STATUS_DOWNLOADED
     if issue.issue_type == ISSUE_TYPE_ARCHIVE:
         issue.reason_message = f"已下载 {len(downloaded_files)} 个压缩包附件，等待外部解压"
+    auto_process_result = None
+    if issue.issue_type == ISSUE_TYPE_ARCHIVE and load_crawl_auto_extract_config(db).get("enabled"):
+        auto_results = process_saved_archive_issues(db, [issue], trigger="download")
+        auto_process_result = auto_results[0] if auto_results else None
     db.flush()
     return success(
         {
             "downloaded_files": downloaded_files,
             "issue": _serialize_crawl_issue(issue),
+            "auto_process": auto_process_result,
         },
         message="附件已下载到监控目录",
     )

@@ -31,6 +31,7 @@ class CrawlIssue(Base):
     stage: str = Column(Text)
     reason_code: str = Column(Text)
     reason_message: str = Column(Text)
+    password_candidates: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
     attachment_urls: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
     attachment_names: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")
     attachment_types: list[str] = Column(ARRAY(Text), nullable=False, server_default="{}")

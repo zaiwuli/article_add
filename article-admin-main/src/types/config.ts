@@ -22,6 +22,16 @@ export interface CrawlerIssueHandlingConfig {
   output_path: string
 }
 
+export interface CrawlerAutoExtractConfig {
+  enabled: boolean
+  schedule_enabled: boolean
+  schedule_cron: string
+  archive_path: string
+  move_original: boolean
+  delete_original: boolean
+  password_dictionary: string
+}
+
 export interface CrawlerIssueAttachment {
   name: string
   url: string
@@ -34,6 +44,7 @@ export interface CrawlerPreviewIssue {
   stage?: string | null
   reason_code?: string | null
   reason_message?: string | null
+  password_candidates?: string[]
   attachments?: CrawlerIssueAttachment[]
   title?: string | null
   category?: string | null
@@ -88,6 +99,7 @@ export interface CrawlerIssueItem {
   stage?: string | null
   reason_code?: string | null
   reason_message?: string | null
+  password_candidates?: string[]
   attachment_urls: string[]
   attachment_names: string[]
   attachment_types: string[]
@@ -102,6 +114,14 @@ export interface CrawlerIssueListResult {
   total: number
   items: CrawlerIssueItem[]
   paths: CrawlerIssueHandlingConfig
+  auto_extract: CrawlerAutoExtractConfig
+  summary: {
+    total: number
+    failed: number
+    pending_manual: number
+    downloaded: number
+    ignored: number
+  }
 }
 
 export interface CrawlerSaveResult {
@@ -118,4 +138,27 @@ export interface CrawlerSaveResult {
   issue_status?: string | null
   failed_ids?: number[]
   action?: 'created' | 'updated' | 'issue_saved'
+  auto_process?: {
+    processed?: number
+    imported?: number
+  }
+}
+
+export interface CrawlerAutoProcessResultItem {
+  issue_id: number
+  title?: string | null
+  downloaded: number
+  extracted: number
+  imported: number
+  status: string
+  message: string
+}
+
+export interface CrawlerAutoProcessResult {
+  total: number
+  downloaded: number
+  extracted: number
+  imported: number
+  failed: number
+  items: CrawlerAutoProcessResultItem[]
 }

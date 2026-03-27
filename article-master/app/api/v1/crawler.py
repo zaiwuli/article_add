@@ -49,6 +49,15 @@ def import_crawl_issue_outputs(
     return crawler_service.import_crawl_issue_outputs(db)
 
 
+@router.post("/issues/process-auto")
+def process_crawl_issues_auto(
+    issue_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return crawler_service.process_crawl_issues_auto(db, issue_id=issue_id)
+
+
 @router.post("/issues/{issue_id}/retry")
 def retry_crawl_issue(
     issue_id: int,

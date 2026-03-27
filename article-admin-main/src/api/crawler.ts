@@ -1,5 +1,6 @@
 import { request } from './request'
 import type {
+  CrawlerAutoProcessResult,
   CrawlerIssueListResult,
   CrawlerPreviewResult,
   CrawlerSaveResult,
@@ -42,7 +43,18 @@ export function getCrawlerIssues(params: {
 }
 
 export function retryCrawlerIssue(issueId: number) {
-  return request<{ action?: string; deleted_issue_id?: number }>({
+  return request<{
+    action?: string
+    deleted_issue_id?: number
+    auto_process?: {
+      issue_id: number
+      downloaded: number
+      extracted: number
+      imported: number
+      status: string
+      message: string
+    }
+  }>({
     url: `/crawler/issues/${issueId}/retry`,
     method: 'post',
   })
@@ -51,6 +63,14 @@ export function retryCrawlerIssue(issueId: number) {
 export function downloadCrawlerIssue(issueId: number) {
   return request<{
     downloaded_files: string[]
+    auto_process?: {
+      issue_id: number
+      downloaded: number
+      extracted: number
+      imported: number
+      status: string
+      message: string
+    }
   }>({
     url: `/crawler/issues/${issueId}/download`,
     method: 'post',
@@ -72,6 +92,14 @@ export function importCrawlerIssueOutputs() {
   }>({
     url: '/crawler/issues/import-outputs',
     method: 'post',
+  })
+}
+
+export function processCrawlerIssuesAuto(issueId?: number) {
+  return request<CrawlerAutoProcessResult>({
+    url: '/crawler/issues/process-auto',
+    method: 'post',
+    params: issueId ? { issue_id: issueId } : undefined,
   })
 }
 

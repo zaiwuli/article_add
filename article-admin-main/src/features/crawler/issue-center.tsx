@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  FolderSearch,
   HardDriveDownload,
-  PackageOpen,
+  Play,
   SearchCheck,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -13,22 +13,15 @@ import {
   getCrawlerIssues,
   ignoreCrawlerIssue,
   importCrawlerIssueOutputs,
+  processCrawlerIssuesAuto,
   retryCrawlerIssue,
 } from '@/api/crawler'
-import type {
-  CrawlerIssueItem,
-} from '@/types/config'
+import type { CrawlerIssueItem } from '@/types/config'
 import { ArticlePagination } from '@/features/articles/components/pagination'
 import { CrawlerIssueCard } from '@/features/crawler/crawler-issue-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -42,15 +35,15 @@ const ISSUE_PAGE_SIZE = 20
 
 function getStatusLabel(status: string) {
   if (status === 'pending_manual') {
-    return '待人工处理'
+    return '待处理'
   }
   if (status === 'downloaded') {
-    return '已下载待导入'
+    return '已下载'
   }
   if (status === 'ignored') {
     return '已忽略'
   }
-  return '失败待处理'
+  return '失败'
 }
 
 function getIssueTypeLabel(issueType: string) {
@@ -58,7 +51,7 @@ function getIssueTypeLabel(issueType: string) {
     return '压缩包附件'
   }
   if (issueType === 'detail_fetch_failed') {
-    return '详情页抓取失败'
+    return '详情抓取失败'
   }
   if (issueType === 'crawl_exception') {
     return '解析异常'
@@ -97,7 +90,7 @@ function getReasonText(issue: CrawlerIssueItem) {
   const reason = (issue.reason_message || '').trim()
 
   if (code === 'archive_detected') {
-    return '检测到压缩包附件，需要先下载到监控目录，再由外部工具解压后导入。'
+    return '检测到压缩包附件，可直接执行自动处理或手动下载。'
   }
   if (code === 'detail_fetch_failed') {
     return '详情页抓取失败，当前没有拿到可解析的页面内容。'
@@ -125,10 +118,36 @@ function getReasonText(issue: CrawlerIssueItem) {
     return '未找到可直接入库的磁力、ED2K 或可解析附件。'
   }
   if (reason.startsWith('downloaded ')) {
-    return '压缩包附件已下载到监控目录，等待外部解压后再扫描导入。'
+    return '压缩包附件已下载到监控目录，等待后续处理。'
   }
 
   return reason || '暂无原因说明'
+}
+
+function SummaryBadge({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string | number
+  tone?: 'default' | 'warn' | 'info' | 'success'
+}) {
+  const toneClass =
+    tone === 'warn'
+      ? 'border-amber-200 bg-amber-50'
+      : tone === 'info'
+        ? 'border-sky-200 bg-sky-50'
+        : tone === 'success'
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-border bg-muted/30'
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <div className='text-[11px] text-muted-foreground'>{label}</div>
+      <div className='mt-1 text-base font-semibold leading-none'>{value}</div>
+    </div>
+  )
 }
 
 export function CrawlerIssueCenter() {
@@ -158,7 +177,7 @@ export function CrawlerIssueCenter() {
       if (res.code !== 0) {
         return
       }
-      toast.success('已重新探测该记录')
+      toast.success(res.message || '已重新探测该记录')
       queryClient.invalidateQueries({ queryKey: ['crawler-issues'] })
     },
   })
@@ -169,8 +188,13 @@ export function CrawlerIssueCenter() {
       if (res.code !== 0) {
         return
       }
-      const count = res.data?.downloaded_files.length ?? 0
-      toast.success(`已下载 ${count} 个附件，当前不会自动解压`)
+      const autoImported = res.data?.auto_process?.imported ?? 0
+      if (autoImported > 0) {
+        toast.success(`已自动下载、解压并导入 ${autoImported} 条资源`)
+      } else {
+        const count = res.data?.downloaded_files.length ?? 0
+        toast.success(`已下载 ${count} 个附件`)
+      }
       queryClient.invalidateQueries({ queryKey: ['crawler-issues'] })
     },
   })
@@ -199,28 +223,29 @@ export function CrawlerIssueCenter() {
     },
   })
 
-  const items = data?.items ?? []
-
-  const summary = useMemo(() => {
-    const statusCount = {
-      total: data?.total ?? 0,
-      pendingManual: 0,
-      downloaded: 0,
-      ignored: 0,
-    }
-
-    for (const item of items) {
-      if (item.status === 'pending_manual') {
-        statusCount.pendingManual += 1
-      } else if (item.status === 'downloaded') {
-        statusCount.downloaded += 1
-      } else if (item.status === 'ignored') {
-        statusCount.ignored += 1
+  const autoProcessMutation = useMutation({
+    mutationFn: () => processCrawlerIssuesAuto(),
+    onSuccess: (res) => {
+      if (res.code !== 0) {
+        return
       }
-    }
+      const data = res.data
+      toast.success(
+        `已处理 ${data?.total ?? 0} 条，导入 ${data?.imported ?? 0} 条，失败 ${data?.failed ?? 0} 条`
+      )
+      queryClient.invalidateQueries({ queryKey: ['crawler-issues'] })
+    },
+  })
 
-    return statusCount
-  }, [data?.total, items])
+  const items = data?.items ?? []
+  const summary = data?.summary ?? {
+    total: 0,
+    failed: 0,
+    pending_manual: 0,
+    downloaded: 0,
+    ignored: 0,
+  }
+  const autoExtract = data?.auto_extract
 
   const pendingArchiveIds = useMemo(
     () =>
@@ -259,105 +284,22 @@ export function CrawlerIssueCenter() {
   })
 
   return (
-    <div className='space-y-6'>
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card className='border-dashed'>
-          <CardContent className='p-5'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <div className='text-sm text-muted-foreground'>当前异常总数</div>
-                <div className='mt-2 text-2xl font-semibold'>{summary.total}</div>
-              </div>
-              <ShieldAlert className='h-6 w-6 text-primary' />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className='border-dashed'>
-          <CardContent className='p-5'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <div className='text-sm text-muted-foreground'>待人工处理</div>
-                <div className='mt-2 text-2xl font-semibold'>
-                  {summary.pendingManual}
-                </div>
-              </div>
-              <PackageOpen className='h-6 w-6 text-amber-600' />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className='border-dashed'>
-          <CardContent className='p-5'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <div className='text-sm text-muted-foreground'>已下载待导入</div>
-                <div className='mt-2 text-2xl font-semibold'>
-                  {summary.downloaded}
-                </div>
-              </div>
-              <HardDriveDownload className='h-6 w-6 text-sky-600' />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className='border-dashed'>
-          <CardContent className='p-5'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <div className='text-sm text-muted-foreground'>自动解压状态</div>
-                <div className='mt-2 text-lg font-semibold'>未上线</div>
-              </div>
-              <FolderSearch className='h-6 w-6 text-rose-500' />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
+    <div className='space-y-4'>
       <Card className='border-dashed'>
-        <CardHeader>
-          <CardTitle className='text-base'>批量操作</CardTitle>
-          <CardDescription>
-            处理目录和附件处理流程已移动到“抓取配置”页，这里只保留抓取处理动作。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className='flex flex-wrap gap-2'>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={() => batchDownloadMutation.mutate()}
-              disabled={
-                batchDownloadMutation.isPending || pendingArchiveIds.length === 0
-              }
-            >
-              <HardDriveDownload className='h-4 w-4' />
-              {batchDownloadMutation.isPending
-                ? '批量下载中...'
-                : '批量下载压缩包附件'}
-            </Button>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending}
-            >
-              <SearchCheck className='h-4 w-4' />
-              {importMutation.isPending ? '扫描中...' : '扫描解压输出'}
-            </Button>
-            <Badge variant='outline'>自动解压：未上线</Badge>
-            <Badge variant='secondary'>待下载压缩包：{pendingArchiveIds.length}</Badge>
+        <CardContent className='space-y-3 p-4'>
+          <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
+            <SummaryBadge label='异常总数' value={summary.total} />
+            <SummaryBadge label='失败待处理' value={summary.failed} tone='warn' />
+            <SummaryBadge label='待下载' value={summary.pending_manual} tone='info' />
+            <SummaryBadge label='已下载待导入' value={summary.downloaded} tone='success' />
+            <SummaryBadge
+              label='自动解压'
+              value={autoExtract?.enabled ? '已开启' : '已关闭'}
+              tone={autoExtract?.enabled ? 'success' : 'default'}
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className='border-dashed'>
-        <CardHeader>
-          <CardTitle className='text-base'>筛选条件</CardTitle>
-        </CardHeader>
-        <CardContent className='grid gap-4 md:grid-cols-[180px_180px_minmax(0,1fr)] xl:grid-cols-[180px_180px_minmax(0,1fr)]'>
-          <div className='space-y-2'>
-            <div className='text-sm font-medium'>状态</div>
+          <div className='grid gap-2 xl:grid-cols-[140px_160px_minmax(0,1fr)_auto_auto_auto]'>
             <Select
               value={status}
               onValueChange={(value) => {
@@ -365,21 +307,18 @@ export function CrawlerIssueCenter() {
                 setStatus(value)
               }}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className='h-9'>
+                <SelectValue placeholder='状态' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='all'>全部</SelectItem>
+                <SelectItem value='all'>全部状态</SelectItem>
                 <SelectItem value='failed'>失败待处理</SelectItem>
                 <SelectItem value='pending_manual'>待人工处理</SelectItem>
                 <SelectItem value='downloaded'>已下载待导入</SelectItem>
                 <SelectItem value='ignored'>已忽略</SelectItem>
               </SelectContent>
             </Select>
-          </div>
 
-          <div className='space-y-2'>
-            <div className='text-sm font-medium'>类型</div>
             <Select
               value={issueType}
               onValueChange={(value) => {
@@ -387,61 +326,105 @@ export function CrawlerIssueCenter() {
                 setIssueType(value)
               }}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className='h-9'>
+                <SelectValue placeholder='类型' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='all'>全部</SelectItem>
+                <SelectItem value='all'>全部类型</SelectItem>
                 <SelectItem value='archive_detected'>压缩包附件</SelectItem>
                 <SelectItem value='resource_missing'>资源缺失</SelectItem>
-                <SelectItem value='detail_fetch_failed'>详情页抓取失败</SelectItem>
+                <SelectItem value='detail_fetch_failed'>详情抓取失败</SelectItem>
                 <SelectItem value='crawl_exception'>解析异常</SelectItem>
               </SelectContent>
             </Select>
-          </div>
 
-          <div className='space-y-2'>
-            <div className='text-sm font-medium'>关键词</div>
             <Input
-              placeholder='按 tid、标题、板块或原因搜索'
+              className='h-9'
+              placeholder='搜索 tid、标题、板块或原因'
               value={keyword}
               onChange={(event) => {
                 setPage(1)
                 setKeyword(event.target.value)
               }}
             />
+
+            <Button
+              type='button'
+              size='sm'
+              className='h-9'
+              onClick={() => autoProcessMutation.mutate()}
+              disabled={autoProcessMutation.isPending}
+            >
+              <Play className='h-4 w-4' />
+              {autoProcessMutation.isPending ? '处理中...' : '立即处理一次'}
+            </Button>
+
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-9'
+              onClick={() => importMutation.mutate()}
+              disabled={importMutation.isPending}
+            >
+              <SearchCheck className='h-4 w-4' />
+              {importMutation.isPending ? '扫描中...' : '仅扫描导入'}
+            </Button>
+
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-9'
+              onClick={() => batchDownloadMutation.mutate()}
+              disabled={
+                batchDownloadMutation.isPending || pendingArchiveIds.length === 0
+              }
+            >
+              <HardDriveDownload className='h-4 w-4' />
+              {batchDownloadMutation.isPending ? '下载中...' : '批量下载'}
+            </Button>
+          </div>
+
+          <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
+            <Badge variant='outline'>
+              <ShieldAlert className='mr-1 h-3.5 w-3.5' />
+              定时处理：{autoExtract?.schedule_enabled ? '已开启' : '已关闭'}
+            </Badge>
+            <Badge variant='outline'>
+              <Sparkles className='mr-1 h-3.5 w-3.5' />
+              待下载压缩包：{pendingArchiveIds.length}
+            </Badge>
           </div>
         </CardContent>
       </Card>
 
-      <div className='flex-1 overflow-y-auto'>
-        <div className='grid gap-3'>
-          {items.map((issue) => (
-            <CrawlerIssueCard
-              key={issue.id}
-              issue={issue}
-              statusLabel={getStatusLabel(issue.status)}
-              issueTypeLabel={getIssueTypeLabel(issue.issue_type)}
-              stageLabel={getStageLabel(issue.stage)}
-              reasonText={getReasonText(issue)}
-              statusClassName={getStatusBadgeClass(issue.status)}
-              retryPending={retryMutation.isPending}
-              downloadPending={downloadMutation.isPending}
-              ignorePending={ignoreMutation.isPending}
-              onRetry={(issueId) => retryMutation.mutate(issueId)}
-              onDownload={(issueId) => downloadMutation.mutate(issueId)}
-              onIgnore={(issueId) => ignoreMutation.mutate(issueId)}
-            />
-          ))}
+      <div className='grid gap-3 xl:grid-cols-2'>
+        {items.map((issue) => (
+          <CrawlerIssueCard
+            key={issue.id}
+            issue={issue}
+            statusLabel={getStatusLabel(issue.status)}
+            issueTypeLabel={getIssueTypeLabel(issue.issue_type)}
+            stageLabel={getStageLabel(issue.stage)}
+            reasonText={getReasonText(issue)}
+            statusClassName={getStatusBadgeClass(issue.status)}
+            retryPending={retryMutation.isPending}
+            downloadPending={downloadMutation.isPending}
+            ignorePending={ignoreMutation.isPending}
+            onRetry={(issueId) => retryMutation.mutate(issueId)}
+            onDownload={(issueId) => downloadMutation.mutate(issueId)}
+            onIgnore={(issueId) => ignoreMutation.mutate(issueId)}
+          />
+        ))}
 
-          {!isLoading && items.length === 0 && (
-            <Card className='border-dashed'>
-              <CardContent className='py-12 text-center text-sm text-muted-foreground'>
-                当前没有待处理的抓取问题记录。
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        {!isLoading && items.length === 0 && (
+          <Card className='border-dashed xl:col-span-2'>
+            <CardContent className='py-10 text-center text-sm text-muted-foreground'>
+              当前没有待处理的抓取问题记录。
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className='flex shrink-0 pt-1'>

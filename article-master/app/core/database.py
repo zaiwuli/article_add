@@ -133,12 +133,27 @@ def _normalize_article_schema(connection):
     )
 
 
+def _normalize_crawl_issue_schema(connection):
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+                ALTER TABLE sht.crawl_issue
+                ADD COLUMN IF NOT EXISTS password_candidates text[] NOT NULL DEFAULT ARRAY[]::text[];
+            END $$;
+            """
+        )
+    )
+
+
 def _normalize_database_schema(connection):
     if connection.dialect.name != "postgresql":
         return
 
     _normalize_config_schema(connection)
     _normalize_article_schema(connection)
+    _normalize_crawl_issue_schema(connection)
 
 
 def init_database():

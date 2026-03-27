@@ -77,13 +77,13 @@ export function CrawlerIssueCard({
   }
 
   return (
-    <Card className='group relative flex w-full max-w-full flex-col gap-4 overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:shadow-xl sm:flex-row'>
+    <Card className='group relative flex w-full max-w-full flex-col gap-3 overflow-hidden rounded-xl p-3 transition-all duration-300 hover:shadow-lg sm:flex-row'>
       <div className='absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-sky-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100' />
 
       <ResponsiveModal
         title='图片预览'
         trigger={
-          <div className='relative h-48 w-full overflow-hidden rounded-xl sm:h-36 sm:w-56 sm:flex-shrink-0'>
+          <div className='relative h-40 w-full overflow-hidden rounded-lg sm:h-32 sm:w-48 sm:flex-shrink-0'>
             {!imageError && images.length > 0 ? (
               <>
                 <img
@@ -142,7 +142,7 @@ export function CrawlerIssueCard({
         </div>
       </ResponsiveModal>
 
-      <div className='flex min-w-0 flex-1 flex-col gap-3'>
+      <div className='flex min-w-0 flex-1 flex-col gap-2'>
         <div className='flex flex-wrap items-center gap-2 text-xs'>
           <Badge variant='secondary'>{issue.section}</Badge>
           {issue.category && <Badge variant='outline'>{issue.category}</Badge>}
@@ -161,7 +161,7 @@ export function CrawlerIssueCard({
         </div>
 
         <div className='space-y-2'>
-          <h6 className='break-words text-base font-semibold leading-snug'>
+          <h6 className='break-words text-sm font-semibold leading-snug sm:text-[15px]'>
             {issue.title || `tid=${issue.tid}`}
           </h6>
           <p className='text-sm text-muted-foreground'>{reasonText}</p>
@@ -176,7 +176,7 @@ export function CrawlerIssueCard({
           </div>
         </div>
 
-        <div className='rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground'>
+        <div className='rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground'>
           <div className='mb-1 flex items-center gap-2 font-medium text-foreground'>
             <FileArchive className='h-4 w-4' />
             附件
@@ -190,7 +190,7 @@ export function CrawlerIssueCard({
         </div>
       </div>
 
-      <div className='flex w-full flex-wrap gap-2 sm:w-auto sm:max-w-[180px] sm:flex-col sm:justify-center'>
+      <div className='flex w-full flex-wrap gap-2 sm:w-auto sm:max-w-[164px] sm:flex-col sm:justify-center'>
         <Button type='button' variant='outline' size='sm' asChild>
           <a href={issue.detail_url} target='_blank' rel='noopener noreferrer'>
             <ExternalLink className='h-4 w-4' />
