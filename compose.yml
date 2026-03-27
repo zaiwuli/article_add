@@ -1,0 +1,63 @@
+name: article_add
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: article_add_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - article_add_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: article_add_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PROXY: ${PROXY}
+      FLARE_SOLVERR_URL: ${FLARE_SOLVERR_URL}
+      TZ: ${TZ}
+    ports:
+      - "${BACKEND_PORT}:8000"
+    volumes:
+      - article_add_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=5)"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: article_add_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT}:80"
+
+volumes:
+  article_add_postgres:
+  article_add_data:
